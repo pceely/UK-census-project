@@ -13,10 +13,10 @@ This in turn provided a link to the Nomis web site, provided buy Durham Universi
 The structure for the project is as follows:
 
 * main file with R code 
-++ ~/ph125.9x_CPY_UKcensus_vx.x.R 
+** ~/ph125.9x_CPY_UKcensus_vx.x.R 
 * report file in R Markdown format, .RMD
-+ ~/ph125.9x_CPY_UKcensus_vx.x.Rmd
+** ~/ph125.9x_CPY_UKcensus_vx.x.Rmd
 * directory with raw data downloded from nomis (the code can do this directly)
-+ ~/data/*.csv
+++ ~/data/*.csv
 * directory with the R object generated during the work (the code can generate these)
-+ ~/rda/*.rda
+++ ~/rda/*.rda
