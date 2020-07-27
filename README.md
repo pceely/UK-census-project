@@ -15,8 +15,10 @@ The structure for the project is as follows:
 * main file with R code 
   * ~/ph125.9x_CPY_UKcensus_vx.x.R 
 * report file in R Markdown format, .RMD
-** ~/ph125.9x_CPY_UKcensus_vx.x.Rmd
+  * ~/ph125.9x_CPY_UKcensus_vx.x.Rmd
 * directory with raw data downloded from nomis (the code can do this directly)
-++ ~/data/*.csv
+  * ~/data/*.csv
 * directory with the R object generated during the work (the code can generate these)
-+ ~/rda/*.rda
+  * ~/rda/*.rda
+  
+  And the code shoule be run within the main directory, with the R code updated with the correct local working directory
