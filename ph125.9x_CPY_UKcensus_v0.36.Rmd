@@ -1,5 +1,5 @@
 ---
-title: "Choose Your Own project - UK census to predict seniority of roles"
+title: "Choose Your Own project - UK census data to predict senior occupation proportion"
 author: "Paul Ceely"
 date: "07/07/2020"
 output:
