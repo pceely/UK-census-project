@@ -1117,7 +1117,7 @@ I created a function to run the models without tuning, and store the data output
 
 
 
-## Generalized linear model (GLM)
+## Generalized linear model - glm
 
 Starting with the GLM in the caret package, which is the same as the linear model, on the smallest training set, "train smaller" of 1000 by 15.
 
@@ -1334,7 +1334,6 @@ This function works with the smaller set with errors, and does not perform well,
 
 The model trained on the small data set is based on the "no qualification" feature, with choices in the tree based on qualification proportions, visible in the importance plot as well, and the full dat set is based on the level4 qualification.
 
-
 ```{r rpart model}
 # uses the rpart package
 if (!require('rpart')) install.packages('rpart'); library('rpart')
@@ -1360,15 +1359,20 @@ importance <- varImp(result_rpart_train_small$train, scale=FALSE)
 plot(importance, 20)
 result_rpart_train_small$train$finalModel
 
-# with the final set  set
+# with the final set
 result_rpart_train_set_final <- results_train_method(train_set_final, "rpart")
-
-
-
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_rpart_train_set_final$results, 1))
+rmse_results %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_rpart_train_set_final$train, scale=FALSE)
+plot(importance, 20)
+result_rpart_train_set_final$train$finalModel
 ```
 
 
-## Support Vector Machines (SVM) - svmLinear
+## Support Vector Machines - svmLinear
 
 This model runs ok, a few seconds with even the small set, and a good first performance.  It does not provide an importance view, as it makes use of the structure of the data with lines between them.
 
@@ -1402,7 +1406,8 @@ rmse_results %>% knitr::kable()
 
 It is able to handle categorical features, but the performance is poor, much worse than without those features.
 
-This is a potentially useful model, although very slow.
+This is a good model, although very slow.
+
 
 ## Stochastic Gradient Boosting	- gbm
 
@@ -1416,11 +1421,11 @@ Another potentially useful model.
 
 
 
-## Multilayer Perceptrons (MLP)
+## Multilayer Perceptrons - mlp
 
 This is part of the artifical neural network family so a different set of machine learning algorithms.
 
-It works, but produces a fairly poor result with the smaller data set, taking a minute or so.  And the small data set took a minute or two, with some errors, with a worse RMSE than the earlier result.
+It works, but produces a fairly poor result with the smaller data set, taking a minute or so.  And the small data set took a minute or two, with some errors, with a worse RMSE than the earlier result.  The package had some interoperability issues with the caret package used throughout the rest of the analysis, so I have not used any of the analysis carried out to avoid creating problems with reviewers' R installations.
 
 
 ## Generalized Additive Model using Splines - gam
@@ -1430,9 +1435,17 @@ This is loosely part of the linear regression model family, and seems to work pr
 It runs slowly though, and did not complete the training with the "small" data set, with increased observations and features.  There may be options to reduce the number of features evaluated, perhaps using another model to identify a small number of features to work with, but this does not appear a good candidate.
 
 
-## Least Absolute Shrinkage and Selection Operator (LASSO)
+## Least Absolute Shrinkage and Selection Operator - lasso
 
 This model, a regularisation model, or logic regression produces decent results with the smaller training set, with quick results from the other data set, handling categorical data.  The rmse results look identical to the GLM model.
+
+|method                        |      rmse|
+|:-----------------------------|---------:|
+|Mean of all locations         | 0.0964704|
+|"glm" - train_small           | 0.0244498|
+|"glm" - train_set_final       | 0.0166809|
+|"lasso" - train_small         | 0.0244498|
+|"lasso" - train_set_final     | 0.0166809|
 
 ```{r lasso modelling, eval=FALSE}
 # this uses the lasso package
@@ -1500,53 +1513,167 @@ data.frame(result_lasso_train_set_final$y_hat,
 ```
 
 
-## Principal Component Analysis	pcr
+## Principal Component Analysis	- pcr
 
-This model, a dimension reduction model, runs fine, not a great initial performance.  There is no information on feature importance.
+This model, a dimension reduction model, runs quickly, with no problems, but the performance is not good and gets worse with the full data set.  It looks like it does not handle a large number of features, which seems ironic given the purpose of the algorithm is to combine and reduce to a smaller number of components.
 
-It runs with no problems, but the performance is not good and gets worse with the full data set.
+|method                        |      rmse|
+|:-----------------------------|---------:|
+|Mean of all locations         | 0.0964704|
+|"pcr" - train_smaller         | 0.0539450|
+|"pcr" - train_small           | 0.0460373|
+|"pcr" - train_set_final       | 0.0869626|
+
+```{r running the principal component analysis modelling}
+# uses package "pls"
+if (!require('pls')) install.packages('pls'); library('pls')
+# with the smaller training set
+result_pcr_train_smaller <- results_train_method(train_smaller, "pcr")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_pcr_train_smaller$results, 1))
+rmse_results %>% knitr::kable()
+#checking the variable importance, doesn't work
+# importance <- varImp(result_pcr_train_smaller$train, scale=FALSE)
+result_pcr_train_smaller$train$modelInfo
+
+# with the small training set
+result_pcr_train_small <- results_train_method(train_small, "pcr")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_pcr_train_small$results, 1))
+rmse_results %>% knitr::kable()
+
+#test the categorical
+result_pcr_train_smaller_cat <- results_train_method(train_smaller_cat, "pcr")
+# it works
+
+# with the full train set
+result_pcr_train_set_final <- results_train_method(train_set_final, "pcr")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_pcr_train_set_final$results, 1))
+rmse_results %>% knitr::kable()
+#performs badly though
+```
 
 
-## Bayesian Generalized Linear Model	bayesglm
+## Bayesian Generalized Linear Model - bayesglm
 
-Runs fine with the fist smaller data set, and with the small data set.  No feature importance unfortunately.
+Runs fine with the fist smaller data set, and with the small data set.  No feature importance unfortunately, although the "finalmodel" does give detail of the coefficients used.
 
 The results in terms of y_hat predictions are very similar to the GLM, so no need to look further at this model.
 
-## Generalized Additive Model using LOESS - gamLoess (regression)
+|method                        |      rmse|
+|:-----------------------------|---------:|
+|Mean of all locations         | 0.0964704|
+|"glm" - train_small           | 0.0244498|
+|"glm" - train_set_final       | 0.0166809|
+|"bayesglm" - train_smaller    | 0.0396911|
+|"bayesglm" - train_small      | 0.0244478|
+
+```{BayesGLM modelling, eval=FALSE}
+# uses the arm package
+if (!require('arm')) install.packages('arm'); library('arm')
+# bayesglm
+# with the smaller training set
+result_bayesglm_train_smaller <- results_train_method(train_smaller, "bayesglm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_bayesglm_train_smaller$results, 1))
+rmse_results %>% knitr::kable()
+#checking the variable importance, doesn't work
+# importance <- varImp(result_bayesglm_train_smaller$train, scale=FALSE)
+result_bayesglm_train_smaller$train$finalModel
+
+# with the small training set
+result_bayesglm_train_small <- results_train_method(train_small, "bayesglm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_bayesglm_train_small$results, 1))
+rmse_results %>% knitr::kable()
+#checking the final model
+result_bayesglm_train_small$train$finalModel
+```
+
+A visual inspection of the y_hat for glm and Bayesglm models, they are the the same, however they are not identical using the "identical" function, and the "all.equal" gives a difference of 3.148678e-05 for the RMSE, and 0.0002200795 across the $\hat_y$ predictions, so slightly different, but I believe similar enough to only use one of the models, the GLM.
+
+```{r comparing glm and bayes glm}
+# compare glm and bayesglm predictions
+result_bayesglm_train_set_final <- results_train_method(train_set_final, "bayesglm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_bayesglm_train_set_final$results, 1))
+rmse_results %>% knitr::kable()
+# load("rda/result_bayesglm_train_set_final.rda")
+load("rda/result_glm_train_set_final.rda")
+result_glm_train_set_final$results$rmse
+# check whether the RMSE are identical, or almost
+identical(result_bayesglm_train_set_final$results$rmse,
+          result_glm_train_set_final$results$rmse)
+all.equal(result_bayesglm_train_set_final$results$rmse,
+          result_glm_train_set_final$results$rmse)
+# check whether the RMSE are identical, or almost
+identical(result_bayesglm_train_set_final$y_hat,
+          result_glm_train_set_final$y_hat)
+all.equal(result_bayesglm_train_set_final$y_hat,
+          result_glm_train_set_final$y_hat)
+```
+
+
+## Generalized Additive Model using LOESS - gamLoess
 
 Quite slow with lots of warnings, even for the smaller data set.
 
-With the smaller data set the important features were the industries, in contrast to most other models which focused on the lone parent, but the performance in terms of RMSE was pretty good.
+With the smaller data set the important features were the industries, in contrast to most other models which focused on the lone parent, but the performance in terms of RMSE was pretty good for the smaller set.
 
 However, similarly to the earlier GAM model, this did not converge with even the small data set.  
 
+```{r gam loess, eval=FALSE}
+# uses the gam package
+if (!require('gam')) install.packages('gam'); library('gam')
+
+# with the smaller training set
+result_gamloess_train_smaller <- results_train_method(train_smaller, "gamLoess")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results,
+                          tail(result_gamloess_train_smaller$results, 1))
+rmse_results %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_gamloess_train_smaller$train, scale=FALSE)
+plot(importance, 20)
+
+# with the small training set
+result_gamloess_train_small <- results_train_method(train_small, "gamLoess")
+# did not complete
+```
 
 
-## Random Forest	ranger
+## Random Forest - ranger
 
-Performed well a little slowly, with the smaller data set.  Not variable importance though.
+Performed well, but slowly with the smaller data set, though.
 
-For the smaller data set, the model runs slowly with high CPU utilisation, but good results, similarly with the final model full, not categorical, a long analysis to run through the various trees, and a decent result, not as good as the GLM model, but one of the top ones.
-
-It runs with the categorical features with a very slight improvement.
+For the smaller data set, the model runs slowly with high CPU utilisation and without providing the variable importance.  The results are OK in term of RMSE, behind the leading models, and with a lot of processing.  It runs with the categorical features with a very slight improvement.
 
 
-## Boosted Generalized Linear Model	glmboost 
+## Boosted Generalized Linear Model	- glmboost 
 
 This runs fine on the smaller set, with importance, appears to be driven by the lone parent as for other models.
 
 It runs quickly, without errors.  It can use the categorical features, but the performance appears to be worse for the small set, for the final set, it is marginally better.
 
 
-## Model Averaged Neural Network	avNNet
+
+
+
+## Model Averaged Neural Network - avNNet
 
 Not bad for the smaller and small sets, but the results get worse with the final set (without the categorical).  It must struggle with more features, however it does operate fairly quickly, and it does work with the categorical features.
 
 With the full training set, the performance was good, not as good as the GLM, but better than most.
 
 
-## Support Vector Machines with Linear Kernel	svmLinear2
+## Support Vector Machines with Linear Kernel -	svmLinear2
 
 A bit slow, no feature importance, but decent results.  In the end this has virtually identical results to svmlinear, so I will leave furtherr investigation here.
 
