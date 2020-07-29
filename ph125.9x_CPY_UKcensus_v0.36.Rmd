@@ -1230,67 +1230,57 @@ train_final_nocat %>%
 ## K nearest neighbours (KNN)
 
 Starting with a simple k nearest neighbours model, KNN in the caret package.
-It took a few seconds with the smallest training set (1000 by 15 features), a result a little worse than the GLM mode .
+It took a few seconds with the smallest training set (1000 by 15 features), a result a little worse than the GLM mode.
 
-There is no ranking of feature importance, which makes sense as it is aggregating in the multi-dimensional space.
+There is no ranking of feature importance.  The model used 9 neighbours.
 
 The larger training sets worked within a few minutes, however, the result was significantly worse than with a smaller training set.  The number of features made no difference, but the number of observations, with a subset it was much better performing.
 
 ```{r knn modelling}
-# next the knn model
 # with the smaller training set
-set.seed(2011, sample.kind="Rounding")
-#default settings
-train_knn <- train(y ~ ., method = "knn", data = train_smaller)
-# importance <- varImp(train_knn, scale=FALSE)
-# plot(importance, 20)
-# making a prediction on the test set:
-y_hat_knn <- predict(train_knn, test_set_final)
-rmse_knn <- rmse(test_set_final$y, y_hat_knn)
-rmse_results <- bind_rows(rmse_results,
-                          tibble(method="KNN - smaller train set",  
-                                 rmse = rmse_knn))
+result_knn_train_smaller <- results_train_method(train_smaller, "knn")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_knn_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_knn_train_smaller$train, scale=FALSE)
+# check the model
+result_knn_train_smaller$train$finalModel
 
-#full training set
-set.seed(2011, sample.kind="Rounding")
-#default settings
-train_knn <- train(y ~ ., method = "knn", data = train_final_nocat)
-y_hat_knn <- predict(train_knn, test_set_final)
-rmse_knn <- rmse(test_set_final$y, y_hat_knn)
-rmse_results <- bind_rows(rmse_results,
-                          tibble(method="KNN - full (less categorical)",  
-                                 rmse = rmse_knn))
+# with the full train set, less categorical
+result_knn_train_final_nocat <- results_train_method(train_final_nocat, "knn")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_knn_train_final_nocat$results, 1))
 rmse_results %>% knitr::kable()
 
 ```
 
 It is able to handle the categorical features, which makes sense, as it is not carrying out a regression analysis, however, the results were poor.
 
-I understand that the algorithm is influenced by the value and therefore the data needs to be normalised - the "smaller" training set does not include the age and location, which have values over 1.  As a quick test, I have removed those features, age and location from the small set.  This works, and performs better than the smaller set, so on the right track, but still not as good as the GLM model.  The model used 9 neighbours.
+I understand that the algorithm is influenced by the absolute value of each feature and therefore the data needs to be normalised.  The "smaller" training set does not include the age and location, which are the two features which have values over 1 and perhaps this is why the performance is better with the smaller set.  As a quick test, I have removed those features, age and location from the small set.  This works, and performs better than the smaller set, so on the right track, but still not as good as the GLM model.  
 
 ```{knn model without age and location}
-#checking the categorical features
-set.seed(2011, sample.kind="Rounding")
-train_knn <- train(y ~ ., method = "knn", data = train_small_cat)
-y_hat_knn <- predict(train_knn, test_set_final)
-rmse_knn <- rmse(test_set_final$y, y_hat_knn)
-rmse_knn
+# test if it will work with categorical feature the the smaller_cat
+result_knn_train_smaller_cat<- results_train_method(train_smaller_cat, "knn")
+# knn does work...
 
-#making a new training set, without the age and area
-train_set_knn <- train_small_cat %>%
+#making a new small training set, without the age and area
+train_set_knn_small <- train_small %>%
   select(-age_median, -area_code)
-#checking the max, should be 1
-max(train_set_knn[1,])
-#check with the new training set
-set.seed(2011, sample.kind="Rounding")
-train_knn <- train(y ~ ., method = "knn", data = train_set_knn)
-y_hat_knn <- predict(train_knn, test_set_final)
-rmse_knn <- rmse(test_set_final$y, y_hat_knn)
-rmse_knn
+#checking the max, should be less than 1
+max(train_set_knn_small[1,])
+
+#check with the new knn small training set
+result_knn_train_set_knn_small <- results_train_method(train_set_knn_small, "knn")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_knn_train_set_knn_small$results, 1))
+rmse_results %>% knitr::kable()
 ```
 
-I normalised the data so that the features are between 0 and 1, working on the full data set.
+I normalised the data so that the features are between 0 and 1, working on the full data set, less categorical data.
 
 $normalised feature = { \frac{feature - min(feature)}{max(feature) - min(feature)}}$
 
@@ -1299,33 +1289,33 @@ The summary function shows the variability of maximum, minimum and median.
 ```{knn with normalised data}
 #normalising the data, to be between 0 and 1
 #look at some of the data, show the max and min
-summary(train_set_final[,4:7])
+summary(train_final_nocat[,4:7])
 #create a function to normalise
 normalise <- function(feature) {
   return ((feature - min(feature)) / (max(feature) - min(feature))) }
 #create a new training set, removing the y value and adding back in
-train_final_norm <- train_set_final[1] %>%
-  cbind(as.data.frame(lapply(train_set_final[2:69], normalise)))
+train_final_norm <- train_final_nocat[1] %>%
+  cbind(as.data.frame(lapply(train_final_nocat[2:59], normalise)))
 #check the data again
-identical(names(train_final_norm), names(train_set_final))
+identical(names(train_final_norm), names(train_final_nocat))
+print("after normalising")
 summary(train_final_norm[,4:7])
+
 #check with the new normalised training set
-set.seed(2011, sample.kind="Rounding")
-train_knn <- train(y ~ ., method = "knn", data = train_final_norm)
-y_hat_knn <- predict(train_knn, test_set_final)
-rmse_knn <- rmse(test_set_final$y, y_hat_knn)
-rmse_results <- bind_rows(rmse_results,
-                          tibble(method="KNN - full (normalised",  
-                                 rmse = rmse_knn))
+result_knn_train_final_norm <- results_train_method(train_final_norm, "knn")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_knn_train_final_norm$results, 1))
 rmse_results %>% knitr::kable()
+
 ```
 
 
-This was run on the full data set, and did not perform well at all, worse than predicting the average, with k = 9 neighbours again.
+This was run on the full data set, and did not perform well at all, worse than predicting the average.  My guess is that with normalising, the algorithm will see all features as the same, even the ones with little variation, or importance.
 
-But some of the features had low variability and therefore would not be good as predictors (in part this is through intuition of the data), but with the normalising, they may be exagerrated.  Therefore I have tried removing the low variability set of features to see if that improves the results, but still poor.
+Overall KNN does not produce great results with this data set.  There may be ways to tune with improved data, as I managed to get to 0.0237531 with the full set less categorical, with the age and location removed.
 
-Overall KNN does not produce great results with this data set.  There may be ways to tune with improved data, as I managed to get to 0.307 with the small set, with the age and location removed.  However, I will work on others before any further tuning here.
+There are other algorithms to look at before any further tuning here.
 
 
 ## Tree model CART - rpart
@@ -1658,9 +1648,9 @@ For the smaller data set, the model runs slowly with high CPU utilisation and wi
 
 ## Boosted Generalized Linear Model	- glmboost 
 
-This runs fine on the smaller set, with importance, appears to be driven by the lone parent as for other models.
+This runs fine on the smaller set, with importance, and is driven by the lone parent as for other models.
 
-It runs quickly, without errors.  It can use the categorical features, but the performance appears to be worse for the small set, for the final set, it is marginally better.
+It runs quickly, without errors.  It can use the categorical features, and with the final set it is marginally better.
 
 
 
@@ -1672,10 +1662,74 @@ Not bad for the smaller and small sets, but the results get worse with the final
 
 With the full training set, the performance was good, not as good as the GLM, but better than most.
 
+There is no information on the importance of features.
+
 
 ## Support Vector Machines with Linear Kernel -	svmLinear2
 
-A bit slow, no feature importance, but decent results.  In the end this has virtually identical results to svmlinear, so I will leave furtherr investigation here.
+Slow, no feature importance, but good results.
+
+```{r svmlinear2, eval=FALSE}
+# uses the e1071 package
+if (!require('e1071')) install.packages('e1071'); library('e1071')
+
+# with the smaller training set
+result_svm2_train_smaller <- results_train_method(train_smaller, "svmLinear2")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results,
+                          tail(result_svm2_train_smaller$results, 1))
+rmse_results %>% knitr::kable()
+#checking the variable importance, not there
+importance <- varImp(result_svm2_train_smaller$train, scale=FALSE)
+
+# with the small training set
+result_svm2_train_small <- results_train_method(train_small, "svmLinear2")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results,
+                          tail(result_svm2_train_small$results, 1))
+rmse_results %>% knitr::kable()
+
+# with the full train set, less categorical
+result_svm2_train_final_nocat <- results_train_method(train_final_nocat, "svmLinear2")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results,
+                          tail(result_svm2_train_final_nocat$results, 1))
+rmse_results %>% knitr::kable()
+
+# seems similar to the svmlinear
+# checking...
+# compare svmlinear and svmlinear2 predictions
+result_svm2_train_set_final <- results_train_method(train_set_final, "svmLinear2")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_svm2_train_set_final$results, 1))
+rmse_results %>% knitr::kable()
+```
+
+In the end this has virtually identical results to svmlinear
+
+Visual inspection shows a small difference with the RMSE and also the y_hats seem very close, tracking each other, with a "Mean relative difference" through the all.equal function of 0.0003343818.  I will leave further investigation here and focus on the svmlinear.
+
+```{comparing svmlinear and svmlinear2}
+load("rda/result_svm2_train_set_final.rda")
+load("rda/result_svm_train_set_final.rda")
+result_svm2_train_set_final$results$rmse
+result_svm_train_set_final$results$rmse
+y_hat_svm2 <- result_svm2_train_set_final$y_hat
+y_hat_svm <- result_svm_train_set_final$y_hat
+
+# check whether the RMSE are identical, or almost
+identical(result_svm2_train_set_final$results$rmse,
+          result_svm_train_set_final$results$rmse)
+all.equal(result_svm2_train_set_final$results$rmse,
+          result_svm_train_set_final$results$rmse)
+# check whether the RMSE are identical, or almost
+identical(result_svm2_train_set_final$y_hat,
+          result_svm_train_set_final$y_hat)
+all.equal(result_svm2_train_set_final$y_hat,
+          result_svm_train_set_final$y_hat)
+```
+
 
 
 
@@ -1686,20 +1740,21 @@ svmRadial
 
 A summary of the models attempted:
 
-Name           | Family               | Results    | Speed    | Feature importance?
----------------|---------------------|-------------|----------|--------
-glm (lm)       | linear regression   | very good    | fast     | yes 
-svmlinear      | clustering          | very good    | slow     | no
-gbm            | boosted trees       | good         | medium  | yes
-ranger         | tree / random forest | ok/good     | slow     | no
-glmboost       | boosted tree        | ok/good      | fast    | yes 
-avNNet         | deep learning       | ok/good      | medium  | no
-gam            | regression         | good on smaller | slow  | no
-gamLoess       | regression         | good on smaller | slow  | 
-knn            | clustering          | poor         |  medium  | no
-rpart          | tree                | poor         | fast     | yes
-mlp            | deep learning       | poor         | slow     | no
-pcr            | dimension reduction | poor        | fast     | no
+Name           | Family               | Results      | Speed    | Feature
+               |                     |               |          | importance?
+---------------|---------------------|---------------|----------|--------
+glm            | linear regression   | very good     | fast     | yes 
+svmlinear      | clustering          | very good      | slow     | no
+gbm            | boosted trees       | good           | medium   | yes
+ranger         | tree / random forest | ok/good       | slow     | no
+glmboost       | boosted tree        | ok             | fast     | yes 
+avNNet         | deep learning       | ok/good        | medium   | no
+gam            | regression          | good on smaller | slow    | no
+gamLoess       | regression          | good on smaller | slow    | yes
+knn            | clustering          | poor           | medium   | no
+rpart          | tree                | poor           | fast     | yes
+mlp            | deep learning       | poor          | slow     | no
+pcr            | dimension reduction | poor          | fast     | no
 svmLinear2 - similar to svmlinear
 lasso - duplicate of the glm model
 bayesglm - similar to the glm
@@ -1824,7 +1879,7 @@ feature_rank %>% select(feature, mean_rank, mean_overall) %>%
   arrange(desc(mean_overall)) %>% head(15) %>% knitr::kable()
 ```
 
-Plotting these features against the outcome $y$, the occupation ratio, you can see that there are varying distributions.
+Plotting these features against the outcome $y$, the managerial and professional occupation ratio, you can see that there are varying distributions.
 
 ```{r plot of the top9 features}
 # plotting the top 9
@@ -1948,16 +2003,16 @@ I ran this for the top 10 to top 50 features, with the respective RMSEs for the 
 ```{r plot of rmse with glm top features}
 # running with features from top 10 to top 50 say
 #set up the RMSE table
-rmse_results <- tibble(method = "Mean of all locations", rmse = rmse_ave)
+load("rda/feature_rank.rda")
 #apply to all of the top 10 to top 50 features
 glm_top10_top50_tmp <- sapply(10:50, function(n){
   print(paste("training with", n, "features"))
-  train_topn <- topfeature(n)
+  train_topn <- topfeature_overall(n)
   print("running results function")
-  result_glm_train_topn <- results_glm(train_topn)
-  result_glm_train_topn$results[2,2]
+  result_glm_train_topn <- results_train_method(train_topn, "glm")
+  result_glm_train_topn$results[,2]
 })
-#exgtract the rmse values and put in a table
+#extract the rmse values and put in a table
 glm_top10_top50 <- t(data.frame(glm_top10_top50_tmp)) %>%
   cbind(feature_no = 10:50)
 colnames(glm_top10_top50) <- c("rmse", "feature_no")
@@ -1974,19 +2029,18 @@ I also tried this for the GBM algorithm.  This is a lot slower, so I focused on 
 
 ```{r plot of number of features vs y for GBM, eval=FALSE}
 # not running as it takes a while
-# similar with GBM
-rmse_results <- tibble(method = "Mean of all locations", rmse = rmse_ave)
 #apply to the top 15 to top 35 features
-gbm_top14_top40_tmp <- sapply(seq(10, 40, 2), function(n){
+gbm_top10_top40_tmp <- sapply(seq(10, 40, 2), function(n){
   print(paste("training with", n, "features"))
   train_topn <- topfeature_overall(n)
   print("running results function")
   result_gbm_train_topn <- results_train_method(train_topn, "gbm")
-  result_gbm_train_topn$results[2,2]
+  result_gbm_train_topn$results[,2]
 })
 #extract the rmse values and put in a table
+gbm_top10_top40_tmp
 gbm_top10_top40 <- t(data.frame(gbm_top10_top40_tmp)) %>%
-  cbind(feature_no = sapply(seq(10, 40, 2)))
+  cbind(feature_no = seq(10, 40, 2))
 colnames(gbm_top10_top40) <- c("rmse", "feature_no")
 ```
 
@@ -2002,20 +2056,18 @@ data.frame(gbm_top10_top40) %>%
   ylab("RMSE")
 ```
 
-
 Similarly for the SVM algorithm, focusing on the top 10 to 40 features, incrementing by 2 each time.
 
 ```{r running svm vs features, eval=FALSE}
 # not running as it takes a while
 # similar with SVM
-rmse_results <- tibble(method = "Mean of all locations", rmse = rmse_ave)
 #apply to the top 10 to top 40 features
 svm_top10_top40_tmp <- sapply(seq(10, 40, 2), function(n){
   print(paste("training with", n, "features"))
   train_topn <- topfeature_overall(n)
   print("running results function")
   result_svm_train_topn <- results_train_method(train_topn, "svmLinear")
-  result_svm_train_topn$results[2,2]
+  result_svm_train_topn$results[,2]
 })
 #extract the rmse values and put in a table
 svm_top10_top40_tmp
@@ -2037,6 +2089,8 @@ data.frame(svm_top10_top40) %>%
   ylab("RMSE")
 ```
 
+This indicates that the top 23 or 28 features have the biggest impact on the overall RMSE, so if we had to cut off, it would be around the 28 features number.
+
 
 ### Running on the other models
 
@@ -2056,6 +2110,18 @@ data.frame(y_hat_gam, y_hat_gamLoess) %>%
   geom_histogram(bins = 30) 
 ```
 
+I tried on the KNN model, but although it was the best it had produced it is still some distance behind the leading models.
+
+```{r knn with the top 28 features}
+# running on knn with 28 features, less age and area
+train_top28_knn <- train_top28 %>%
+  select(-age_median, -area_code)
+# with the train_top28 training set
+result_knn_train_top28_knn <- results_train_method(train_top28_knn, "knn")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, tail(result_knn_train_top28_knn$results, 1))
+rmse_results %>% knitr::kable()
+```
 
 ### Final ensemble model
 
@@ -2148,11 +2214,41 @@ The "high correlation" function in caret did not work well at helping feature se
 
 By far and away the most important element for high quality occupation is qualifications.  As this is by area, it is not clear on cause and effect, that is, the highly qualified people all move to where the best jobs are, or that the best jobs are where there are highly qualified people, but the public policy implications are clear, ensuring all groups have access to education and qualifications is critical to ensure no one is left behind.
 
+
+
+
 ## Further work
+
+### Modelling and algorithms
+
+From a modelling perspective, it would be good to focus on one or two algorithms and see how far the models can be optimised to improve the performance - will it outperform an ensemble?
+
+### Societal implications
 
 This study was to focus on machine learning, but it would be interesting to extend the work to look at the correlation between the different factors.  For example, Jewish ethnicities are positively correlated and Pakistini and Bangladeshi are negatively, and this could be due to education and qualifications (the press mentions the poor school outcomes for some ethinicities), and it would be interesting to investigate which are convoluted and which are causal in terms of drivers.
 
-From a modelling perspective, it would be good to focus on one or two algorithms and see how far the models can be optimised to improve the performance - will it outperform an ensemble?
+
+
+
+### Further potential implications
+
+
+https://www.theguardian.com/business/2020/jul/28/bame-representation-uk-top-jobs-colour-of-power-survey 
+"The proportion of black, Asian and minority ethnic people in some of the 1,100 most powerful jobs in the UK has barely moved over the past three years, according to a study that highlights the lack of non-white representation across key roles.
+
+Only 51 out of the 1097 most powerful roles in the country are filled by non-white individuals, an increase of only 1.2%, or 15 people, since 2017, the Colour of Power survey by consultants Green Park and not-for-profit organisation Operation Black Vote said.
+
+That represented 4.7% of the total number compared with the 13% proportion of the UK population."
+https://thecolourofpower.com/
+
+
+https://www.theguardian.com/fashion/2020/jul/29/numbers-dont-lie-how-data-reveals-fashions-inclusivity-problem
+https://www.ethnicity-facts-figures.service.gov.uk/work-pay-and-benefits/employment/employment-by-occupation/latest
+
+https://www.ethnicity-facts-figures.service.gov.uk/education-skills-and-training/after-education/destinations-and-earnings-of-graduates-after-higher-education/latest
+
+
+
 
 
 
