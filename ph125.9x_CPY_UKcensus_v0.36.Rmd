@@ -1,5 +1,5 @@
 ---
-title: "Choose Your Own project - UK census data to predict senior occupation proportion"
+title: "Choose Your Own project - Using UK census data to predict occupations"
 author: "Paul Ceely"
 date: "07/07/2020"
 output:
@@ -28,6 +28,7 @@ library(caret)
 This project is part of the **EDX course HarvardX: PH125.9x Data Science: Capstone**, which builds on the previous 8 covering using R, statistics, regression, machine learning among other data science topics, presented by Professor Rafael Irizarry, as described here https://www.edx.org/professional-certificate/harvardx-data-science.
 
 The project is inspired by the UCI machine learning repository, to predict ages based on census data, here https://archive.ics.uci.edu/ml/datasets/Adult, and also the recent Black Lives Matter movements and recognition of the under-representation of certain groups in senior positions within society.
+https://www.theguardian.com/business/2020/jul/28/bame-representation-uk-top-jobs-colour-of-power-survey 
 
 I will be using the UK 2011 census data.  This data does not have individual information, instead numbers within a geographical area, and in addition, it does not include pay, but does include occupation.
 
@@ -50,7 +51,10 @@ Key steps carried out:
 4.  Initial investigation and visualisation   
 5.  Create a training and test set   
 6.  Further data exploration including baseline of prediction   
-7.  Building and testing models   
+7.  Training and testing a variety of models   
+8.  Building an ensemble
+9.  Finalising a model and running on the validation set
+10. Interpretation, and investigation in to feature importance
 
 The methodology and code was developed using insight gained from the course, and also in the accompanying text book **An Introduction to Data Science, by Rafael A Irizarry,  https://rafalab.github.io/dsbook/**.
 
@@ -945,7 +949,7 @@ correlationmatrix[,index][abs(correlationmatrix[,index]) > 0.7]
 
 
 
-## Subset of data for initial testing
+### Subset of data for initial testing
 
 The data set for training has 5832 observations of 70 variables.  We have the following features that can be removed with limited impact, or to avoid categorical issues, in addition to removing the "geo-code" column as it is neither a predictor nor outcome:
 
@@ -1066,17 +1070,18 @@ I will go through a number of model types, examples of families.
 
 This is a continuous rather than classification problem, therefore models suited to classification, such as Naive Bayes, Adaboost will not work.
 
-## Machine learning families
+### Machine learning families
 
 There are no definitive lists of families, at least in part as there are many overlapping approaches, and it is a matter of opinion as to where algorithms fit.
 
-I have used the following to try and structure the model selection, and choose a few from each grouuping.
+I have used the following to try and structure the model selection, and choose a few from each grouping, and then focusing on the families that appear to be fruitful.
 
 * Regression, regularisation
 + Linear Regression, Logistic Regression - glm
 + Generalized Additive Model using Splines - gam 
 + Locally Estimated Scatterplot Smoothing (LOESS) gamLoess
 + Least Absolute Shrinkage and Selection Operator (LASSO)
++ Support Vector Machines (SVM) - svmLinear
 + Ridge regression
 
 * Bayesian
@@ -1111,13 +1116,45 @@ I have used the following to try and structure the model selection, and choose a
 + Stochastic Gradient Descent
 
 
-## General modelling
+### General modelling
 
 I created a function to run the models without tuning, and store the data output in a list object, including the rmse.  This is then used through the rest of the modelling.
 
+```{r function to run the models}
+# creating a function to run the models, with different algorithms and data sets, with default settings.
+results_train_method <- function(traindata, algorithm){
+  trainname <- paste("train", deparse(substitute(algorithm)), deparse(substitute(traindata)), sep = "_")
+  print(paste0("running ", trainname))
+  #setting the random seed
+  set.seed(2011, sample.kind="Rounding")
+  #run the model training on the training data
+  train_obj <- train(y ~ ., method = algorithm, data = traindata)
+  # making a prediction on the test set
+  yhat_obj <- predict(train_obj, test_set_final)
+  # calculating the rmse
+  rmse_obj <- rmse(test_set_final$y, yhat_obj)
+  print(paste("rmse result is", rmse_obj))
+  #adding to the RMSE list
+  resultname <- paste0(deparse(substitute(algorithm)), " - ", deparse(substitute(traindata)))
+  print(paste("creating result list for", resultname))
+  rmse_results <- tibble(method = resultname, rmse = rmse_obj)
+  #saving the results
+  #returning the training model, y_hats, and rmse results
+  my_list <- list("train" = train_obj, "y_hat" = yhat_obj, "results" = rmse_results)
+  return(my_list) 
+  # return(rmse_results)
+}
+load("rda/train_small.rda")
+load("rda/train_smaller.rda")
+load("rda/train_small_cat.rda")
+load("rda/train_smaller_cat.rda")
+load("rda/train_final_nocat.rda")
+load("rda/test_set_final.rda")
+load("rda/train_set_final.rda")
+```
 
 
-## Generalized linear model - glm
+### Generalized linear model - glm
 
 Starting with the GLM in the caret package, which is the same as the linear model, on the smallest training set, "train smaller" of 1000 by 15.
 
@@ -1193,7 +1230,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 ```
 
-### Insights and visualisation
+#### Insights and visualisation
 
 The following were important features from the various versions of the model
 * all qualifications, level 4...
@@ -1226,8 +1263,13 @@ train_final_nocat %>%
   ylab("feature values")
 ```
 
+|method                            |      rmse|
+|:---------------------------------|---------:|
+|Mean of all locations             | 0.0964704|
+|"glm" - train_set_final           | 0.0166809|
 
-## K nearest neighbours (KNN)
+
+### K nearest neighbours (KNN)
 
 Starting with a simple k nearest neighbours model, KNN in the caret package.
 It took a few seconds with the smallest training set (1000 by 15 features), a result a little worse than the GLM mode.
@@ -1307,9 +1349,7 @@ result_knn_train_final_norm <- results_train_method(train_final_norm, "knn")
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_knn_train_final_norm$results, 1))
 rmse_results %>% knitr::kable()
-
 ```
-
 
 This was run on the full data set, and did not perform well at all, worse than predicting the average.  My guess is that with normalising, the algorithm will see all features as the same, even the ones with little variation, or importance.
 
@@ -1317,14 +1357,20 @@ Overall KNN does not produce great results with this data set.  There may be way
 
 There are other algorithms to look at before any further tuning here.
 
+|method                            |      rmse|
+|:---------------------------------|---------:|
+|Mean of all locations             | 0.0964704|
+|"glm" - train_set_final           | 0.0166809|
+|"knn" - train_set_knn_final_nocat | 0.0237531|
 
-## Tree model CART - rpart
+
+### Tree model CART - rpart
 
 This function works with the smaller set with errors, and does not perform well, although it runs quickly 
 
 The model trained on the small data set is based on the "no qualification" feature, with choices in the tree based on qualification proportions, visible in the importance plot as well, and the full dat set is based on the level4 qualification.
 
-```{r rpart model}
+```{r rpart model, eval=FALSE}
 # uses the rpart package
 if (!require('rpart')) install.packages('rpart'); library('rpart')
 
@@ -1361,45 +1407,69 @@ plot(importance, 20)
 result_rpart_train_set_final$train$finalModel
 ```
 
+|method                            |      rmse|
+|:---------------------------------|---------:|
+|Mean of all locations             | 0.0964704|
+|"glm" - train_set_final           | 0.0166809|
+|"rpart" - train_set_final         | 0.0507058|
 
-## Support Vector Machines - svmLinear
 
-This model runs ok, a few seconds with even the small set, and a good first performance.  It does not provide an importance view, as it makes use of the structure of the data with lines between them.
+### Support Vector Machines - svmLinear
+
+This model is loosely in the clustering family, similar to KNN, but it also works by creating lines between groups, something a bit like linear regression related to the GLM, but using the kernel to shift the data in to different dimensions allowing non-linear boundaries.
+
+This model runs slowly, a few seconds with even the small set, but a good RMSE result.  It does not provide an importance view, as it makes use of the structure of the data with lines between them.
 
 The second set of data, the small training set of 5832 by 36 has a similar performance to the GLM, but is slow.
 
-```{r svm model}
+```{r svm model, eval=FALSE}
+# using the kernlab package
+if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
+
 # with the smaller training set
-set.seed(2011, sample.kind="Rounding")
-train_svm <- train(y ~ ., method = "svmLinear", data = train_smaller)
-# importance <- varImp(train_svm, scale=FALSE)
-# plot(importance, 20)
-# making a prediction on the test set:
-y_hat_svm <- predict(train_svm, test_set_final)
-rmse_svm <- rmse(test_set_final$y, y_hat_svm)
-rmse_results <- bind_rows(rmse_results,
-                          tibble(method="SVM Linear - smaller train set",  
-                                 rmse = rmse_svm))
+result_svm_train_smaller <- results_train_method(train_smaller, "svmLinear")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_svm_train_smaller$results, 1))
+rmse_results %>% knitr::kable()
+# importance <- varImp(result_svm_train_smaller$train, scale=FALSE)
+
+# with the small training set
+result_svm_train_small <- results_train_method(train_small, "svmLinear")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_svm_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
+# with the full train set, less categorical
+result_svm_train_final_nocat <- results_train_method(train_final_nocat, "svmLinear")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_svm_train_final_nocat$results, 1))
+rmse_results %>% knitr::kable()
+
+# test if it will work with categorical feature the the smaller_cat
+train_svm <- train(y ~ ., method = "svmLinear", data = train_smaller_cat)
+# svm does work...
+
 # with the full training set
-set.seed(2011, sample.kind="Rounding")
-train_svm <- train(y ~ ., method = "svmLinear", data = train_final_nocat)
-# making a prediction on the test set:
-y_hat_svm <- predict(train_svm, test_set_final)
-rmse_svm <- rmse(test_set_final$y, y_hat_svm)
-rmse_results <- bind_rows(rmse_results,
-                          tibble(method="SVM Linear - full (less categorical)",  
-                                 rmse = rmse_svm))
+result_svm_train_set_final <- results_train_method(train_set_final, "svmLinear")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_svm_train_set_final$results, 1))
 rmse_results %>% knitr::kable()
 ```
 
-It is able to handle categorical features, but the performance is poor, much worse than without those features.
+It is able to handle categorical features, and overall is a good model, although very slow.
 
-This is a good model, although very slow.
+|method                            |      rmse|
+|:---------------------------------|---------:|
+|Mean of all locations             | 0.0964704|
+|"glm" - train_set_final           | 0.0166809|
+|"svmLinear" - train_set_final     | 0.0167375|
 
 
-## Stochastic Gradient Boosting	- gbm
+### Stochastic Gradient Boosting	- gbm
 
 This model runs well, with results very similar to the GLM and SVM algorithms.  It is not as slow as the SVM model to run, but the results are not quite as good.
 
@@ -1411,23 +1481,25 @@ Another potentially useful model.
 
 
 
-## Multilayer Perceptrons - mlp
+### Multilayer Perceptrons - mlp
 
 This is part of the artifical neural network family so a different set of machine learning algorithms.
 
 It works, but produces a fairly poor result with the smaller data set, taking a minute or so.  And the small data set took a minute or two, with some errors, with a worse RMSE than the earlier result.  The package had some interoperability issues with the caret package used throughout the rest of the analysis, so I have not used any of the analysis carried out to avoid creating problems with reviewers' R installations.
 
 
-## Generalized Additive Model using Splines - gam
+### Generalized Additive Model using Splines - gam
 
-This is loosely part of the linear regression model family, and seems to work pretty well with the smaller data set, and does provide the important variables, for the smaller set, being loneparent.
+As GLM is still the leading model, I would like to see if there are other related models which could also be good.
+
+GAM is loosely part of the linear regression model family, and seems to work pretty well with the smaller data set, and does provide the important variables, for the smaller set, being loneparent.
 
 It runs slowly though, and did not complete the training with the "small" data set, with increased observations and features.  There may be options to reduce the number of features evaluated, perhaps using another model to identify a small number of features to work with, but this does not appear a good candidate.
 
 
-## Least Absolute Shrinkage and Selection Operator - lasso
+### Least Absolute Shrinkage and Selection Operator - lasso
 
-This model, a regularisation model, or logic regression produces decent results with the smaller training set, with quick results from the other data set, handling categorical data.  The rmse results look identical to the GLM model.
+Again looking at linear regression models, related to GLM, I am trying Lasso, a regularisation model, or logic regression produces decent results with the smaller training set, with quick results from the other data set, handling categorical data.  The rmse results look identical to the GLM model.
 
 |method                        |      rmse|
 |:-----------------------------|---------:|
@@ -1503,7 +1575,7 @@ data.frame(result_lasso_train_set_final$y_hat,
 ```
 
 
-## Principal Component Analysis	- pcr
+### Principal Component Analysis	- pcr
 
 This model, a dimension reduction model, runs quickly, with no problems, but the performance is not good and gets worse with the full data set.  It looks like it does not handle a large number of features, which seems ironic given the purpose of the algorithm is to combine and reduce to a smaller number of components.
 
@@ -1548,9 +1620,9 @@ rmse_results %>% knitr::kable()
 ```
 
 
-## Bayesian Generalized Linear Model - bayesglm
+### Bayesian Generalized Linear Model - bayesglm
 
-Runs fine with the fist smaller data set, and with the small data set.  No feature importance unfortunately, although the "finalmodel" does give detail of the coefficients used.
+This is from the Bayes, family, a regression model as most of the Bayes models are for categorical problems.  It runs fine with the fist smaller data set, and with the small data set.  No feature importance unfortunately, although the "finalmodel" does give detail of the coefficients used.
 
 The results in terms of y_hat predictions are very similar to the GLM, so no need to look further at this model.
 
@@ -1611,9 +1683,9 @@ all.equal(result_bayesglm_train_set_final$y_hat,
 ```
 
 
-## Generalized Additive Model using LOESS - gamLoess
+### Generalized Additive Model using LOESS - gamLoess
 
-Quite slow with lots of warnings, even for the smaller data set.
+Trying again with a GAM model, as it is in the GLM family, and the GAM did run well on the smaller set.  However, it appears to suffer the same issues, being  slow with lots of warnings, even for the smaller data set.
 
 With the smaller data set the important features were the industries, in contrast to most other models which focused on the lone parent, but the performance in terms of RMSE was pretty good for the smaller set.
 
@@ -1639,14 +1711,14 @@ result_gamloess_train_small <- results_train_method(train_small, "gamLoess")
 ```
 
 
-## Random Forest - ranger
+### Random Forest - ranger
 
-Performed well, but slowly with the smaller data set, though.
+I tried this model as part of the tree model, a more complex one than CART.  It performed well, but slowly with the smaller data set, though.
 
 For the smaller data set, the model runs slowly with high CPU utilisation and without providing the variable importance.  The results are OK in term of RMSE, behind the leading models, and with a lot of processing.  It runs with the categorical features with a very slight improvement.
 
 
-## Boosted Generalized Linear Model	- glmboost 
+### Boosted Generalized Linear Model	- glmboost 
 
 This runs fine on the smaller set, with importance, and is driven by the lone parent as for other models.
 
@@ -1656,16 +1728,18 @@ It runs quickly, without errors.  It can use the categorical features, and with 
 
 
 
-## Model Averaged Neural Network - avNNet
+### Model Averaged Neural Network - avNNet
 
-Not bad for the smaller and small sets, but the results get worse with the final set (without the categorical).  It must struggle with more features, however it does operate fairly quickly, and it does work with the categorical features.
+This is a neural network model, the first I have tried.  Not bad for the smaller and small sets, but the results get worse with the final set (without the categorical).  It must struggle with more features, however it does operate fairly quickly, and it does work with the categorical features.
 
 With the full training set, the performance was good, not as good as the GLM, but better than most.
 
 There is no information on the importance of features.
 
 
-## Support Vector Machines with Linear Kernel -	svmLinear2
+### Support Vector Machines with Linear Kernel -	svmLinear2
+
+As the SVM linear was the best so far other than GLM, I wanted to try some related models to see if there could be an improvement.
 
 Slow, no feature importance, but good results.
 
@@ -1731,19 +1805,64 @@ all.equal(result_svm2_train_set_final$y_hat,
 ```
 
 
+### Support Vector Machines with Radial Kernel -	svmRadial
+
+As the SVM model is the best performing so far after the GLM, and a leading model type, I have had a quick check on another version of it, the SVM Radial, which although using the same package, "kernlab", it has a different kernel, which means it handles the non-linear elements differently.
+
+This model runs more quickly than the svmlinear and svmlinear2 models, but is also much better performing, the leading model so far, by some distance.
+
+```{r svm radial modelling, eval=FALSE}
+# uses package kernlab
+if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
+
+# with the smaller training set
+result_svmradial_train_smaller <- results_train_method(train_smaller, "svmRadial")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results,
+                          tail(result_svmradial_train_smaller$results, 1))
+rmse_results %>% knitr::kable()
+#checking the variable importance, not here
+importance <- varImp(result_svmradial_train_smaller$train, scale=FALSE)
+
+# with the small training set
+result_svmradial_train_small <- results_train_method(train_small, "svmRadial")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results,
+                          tail(result_svmradial_train_small$results, 1))
+rmse_results %>% knitr::kable()
+
+# with the full train set, less categorical
+result_svmradial_train_final_nocat <- results_train_method(train_final_nocat, "svmRadial")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results,
+                          tail(result_svmradial_train_final_nocat$results, 1))
+rmse_results %>% knitr::kable()
+
+# with the full train set
+result_svmradial_train_set_final <- results_train_method(train_set_final, "svmRadial")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results,
+                          tail(result_svmradial_train_set_final$results, 1))
+rmse_results %>% knitr::kable()
+```
 
 
-svmRadial
+|method                          |      rmse|
+|:-------------------------------|---------:|
+|"glm" - train_set_final         | 0.0166809|
+|"svmLinear" - train_set_final   | 0.0167375|
+|"svmRadial" - train_final_nocat | 0.0157481|
+|"svmRadial" - train_set_final   | 0.0145255|
 
 
-## Model summary
+### Model summary
 
 A summary of the models attempted:
 
-Name           | Family               | Results      | Speed    | Feature
-               |                     |               |          | importance?
----------------|---------------------|---------------|----------|--------
-glm            | linear regression   | very good     | fast     | yes 
+Name           | Family              | Results        | Speed    | Feature
+               |                     |                |          | importance?
+---------------|---------------------|----------------|----------|--------
+glm            | linear regression   | very good      | fast     | yes 
 svmlinear      | clustering          | very good      | slow     | no
 gbm            | boosted trees       | good           | medium   | yes
 ranger         | tree / random forest | ok/good       | slow     | no
@@ -1753,82 +1872,100 @@ gam            | regression          | good on smaller | slow    | no
 gamLoess       | regression          | good on smaller | slow    | yes
 knn            | clustering          | poor           | medium   | no
 rpart          | tree                | poor           | fast     | yes
-mlp            | deep learning       | poor          | slow     | no
-pcr            | dimension reduction | poor          | fast     | no
+mlp            | deep learning       | poor           | slow     | no
+pcr            | dimension reduction | poor           | fast     | no
+svmRadial      | clustering          | very good      | medium   | no
 svmLinear2 - similar to svmlinear
 lasso - duplicate of the glm model
 bayesglm - similar to the glm
 
 
-
 ## Ensemble model
 
-There are a handful of good models, and with these I built an ensemble.  As these is a regression model, I took the average of the y_hat predictions for the three models.
+As a next step I will try and build an ensemble of the best of the models that have been tried, which should have a better result than a single model.
 
-Initially I used the 5 best models models:
+As this is a regression problem, I took the average of the y_hat predictions for the models.
 
-* Generalized linear model (GLM) - glm
-* Support Vector Machines (SVM) - svmLinear
-* Stochastic Gradient Boosting (GBM) - gbm
-* Random Forest	- ranger
-* Model Averaged Neural Network - avNNet
+Following are the leading models.
 
-With a result of 0.0166230, which is slightly better than the leading model so far, GLM with 0.0166809.
-
-```{r ensemble model 1}
+```{r best models so far}
+load("rda/rmse_results.rda")
 # Identify the leading models, the top 5
 rmse_results %>%
   arrange(rmse) %>% head(15) %>% knitr::kable()
+```
+
+Initially I used the 5 best models:
+
+* Support Vector Machines with Radial Kernel -	svmRadial
+* Generalized linear model - glm
+* Support Vector Machines - svmLinear
+* Stochastic Gradient Boosting - gbm
+* Model Averaged Neural Network - avNNet
+
+With a result of 0.0155562, this is much worse than the svmRadial on its own at 0.0145255.
+
+```{r ensemble model 1}
 # create an ensemble y hats
-y_hat_ens_table <- data.frame(number = 1:length(y_hat_glm)) %>%
-  cbind(data.frame(y_hat_glm)) %>%
-  cbind(data.frame(y_hat_gbm)) %>%
-  cbind(data.frame(y_hat_svm)) %>%
-  cbind(data.frame(y_hat_ranger)) %>%
-  cbind(data.frame(y_hat_avnnet)) %>%
+load("rda/result_glm_train_set_final.rda")
+load("rda/result_svm_train_set_final.rda")
+load("rda/result_svmradial_train_set_final.rda")
+load("rda/result_gbm_train_set_final.rda")
+load("rda/result_avnnet_train_set_final.rda")
+result_gbm_train_set_final$y_hat
+# create table of y_hat
+y_hat_ens_table <- 
+  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_gbm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_avnnet_train_set_final$y_hat)) %>%
   select(-number) %>%
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble",  
+                          tibble(method="Ensemble glm, gbm, svm, svmRadial, avvnet",  
                                  rmse = rmse_ens))
-rmse_results
+rmse_results %>% tail(5) %>% knitr::kable()
 ```
 
-I re-ran with the leading 3 models (GLM, SVM, GBM) as the other 2 were quite a lot worse, and this provided a better still RMSE, 0.0160373. 
+I re-ran with the leading 3 models (GLM, SVM Linear, SVM Radial) as the other 2 were quite a lot worse, and this provided a better still RMSE, 0.0149617, but still behind the svmRadial model. 
 
 ```{r ensemble model 2}
 #a smaller ensemble of the three best models
-y_hat_ens_table2 <- data.frame(number = 1:length(y_hat_glm)) %>%
-  cbind(data.frame(y_hat_glm)) %>%
-  cbind(data.frame(y_hat_gbm)) %>%
-  cbind(data.frame(y_hat_svm)) %>%
+y_hat_ens_table2 <- 
+  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
   select(-number) %>%
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table2$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble2",  
+                          tibble(method="Ensemble2 glm, svm, svmRadial",  
                                  rmse = rmse_ens))
+rmse_results %>% tail(5) %>% knitr::kable()
 ```
 
+|method                            |      rmse|
+|:---------------------------------|---------:|
+|"svmRadial" - train_set_final     | 0.0145255|
+|Ensemble2                         | 0.0149617|
+|Ensemble                          | 0.0155562|
+|"glm" - train_set_final           | 0.0166809|
+|"svmLinear" - train_set_final     | 0.0167375|
+|"gbm" - train_set_final           | 0.0174674|
+|"ranger" - train_set_final        | 0.0182762|
+|"avNNet" - train_set_final        | 0.0195682|
+|"glmboost" - train_set_final      | 0.0200320|
 
-|method                                |      rmse|
-|:-------------------------------------|---------:|
-|Ensemble2                             | 0.0160373|
-|Ensemble                              | 0.0166176|
-|GLM - full                            | 0.0166809|
-|SVM Linear - full                     | 0.0167375|
-|GBM - full                            | 0.0174674|
-|Ranger - full                         | 0.0182762|
-|avNNet - full                         | 0.0195682|
-|GLMboost - full                       | 0.0200320|
 
-
-## Improving other models through feature selection
+### Improving other models through feature selection
 
 The GAM, GAMLoess models look promising but do not work on larger data sets, and the KNN had poor results with larger data sets.  This may be due to the number of features, and given that from the models that show it, the importance drops off quite quickly we may be able to summarise the features to make use of these models.
 
@@ -1841,29 +1978,33 @@ rmse_results %>%
 Of the models that worked on the full set, there are three which provided information on the importance of features, GBM, GLM and GLMBoost.  I took these and created averages of the importance, two methods, average of the ranking and average of the actual scores, normalised.  The latter should provide the better result overall, and with testing it does so.
 
 ```{r prioritised importance of features}
-gbm_rank <- 
-  data.frame(gbm_rank = 1:length(importance_gbm$importance$Overall)) %>%
-  cbind(arrange(importance_gbm$importance, desc(Overall))) %>%
-  rownames_to_column(var="feature") %>%
-  mutate("gbm_overall" = Overall/max(Overall)) %>%
+# using GLM, GBM, GLM boost to rank features
+load("rda/importance_gbm.rda")
+load("rda/importance_glm.rda")
+load("rda/importance_glmboost.rda")
+#create ranking for gbm algorithm, with normalised score
+gbm_rank <- importance_gbm$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(gbm_rank = 1:length(importance_gbm$importance$Overall))) %>%
+  mutate("gbm_overall" = Overall/max(Overall)) %>% 
   select(-Overall)
 head(gbm_rank)
 #create ranking for glm algorithm, with normalised score
-glm_rank <- 
-  data.frame(glm_rank = 1:length(importance_glm$importance$Overall)) %>%
-  cbind(arrange(importance_glm$importance, desc(Overall))) %>%
-  rownames_to_column(var="feature") %>%
-  mutate("glm_overall" = Overall/max(Overall)) %>%
+glm_rank <- importance_glm$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(glm_rank = 1:length(importance_glm$importance$Overall))) %>%
+  mutate("glm_overall" = Overall/max(Overall)) %>% 
   select(-Overall)
 head(glm_rank)
 #create ranking for glmboost algorithm, with normalised score
-glmboost_rank <- 
-  data.frame(glmboost_rank = 1:length(importance_glmboost$importance$Overall)) %>%
-  cbind(arrange(importance_glmboost$importance, desc(Overall))) %>%
-  rownames_to_column(var="feature") %>%
-  mutate("glmboost_overall" = Overall/max(Overall)) %>%
+glmboost_rank <- importance_glmboost$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(glmboost_rank = 1:length(importance_glmboost$importance$Overall))) %>%
+  mutate("glmboost_overall" = Overall/max(Overall)) %>% 
   select(-Overall)
-head(glmboost_rank)
 
 # combined ranking table, with mean, and reordered
 feature_rank <- glm_rank %>%
@@ -1928,21 +2069,22 @@ The following are negatively correlated:
 * cohoabiting_25_64
 * no_qual_25_64
 
-
 ```{r list the highly correlated features}
 #looking at correlation with y
 data.frame(cor(train_set_final)) %>%
   select(y) %>%
   rownames_to_column(var="feature") %>%
-  filter(feature %in% feature_top15) %>% 
+  filter(feature %in% feature_top9) %>% 
   arrange(desc(abs(y))) %>%
   knitr::kable()
 ```
 
 
-### Testing the important features
+### Identifying the right number of features
 
-I have the performance of the three models with the existing training sets, and now can compare with various numbers of the top features. I will do this for the leading models, GLM, SVM and GBM.
+Now we have the ranking order of priority, what is the optimal number for the models that can not handle many features?
+
+I have the performance of the models with the existing training sets (smaller, small, full etc.), and now can calculate  with various numbers of the top features. I will do this for the leading models, GLM, SVM Linear, SVM Radial. 
 
 I created a function to create lists of the top n features based on the rankings, and then using that create the training sets.
 
@@ -1979,23 +2121,37 @@ train_top20 <- topfeature(20)
 train_top30 <- topfeature(30)
 ```
 
-Using this a quick check shows that even though the importance of some of the features is low, they are making a significant improvement to the rmse, say for going from 15 to 20 features has a big drop.
+Using this a quick check shows that even though the importance of some of the features is low, they are making a significant improvement to the rmse, say for going from 15 to 20 features has a big drop.  Also, it shows that prioritisig by overall mean score is better than the mean rank, as expected.
 
 ```{r top 15 and 20 features with GLM}
 # running on the GLM model
 # with the top15 training set
-result_glm_train_top15 <- results_glm(train_top15)
-load("rda/rmse_results.rda")
-rmse_results <- result_glm_train_top15$results
-rmse_results %>% knitr::kable()
-#checking the variable importance
-importance <- varImp(result_glm_train_top15$train, scale=FALSE)
-plot(importance, 20)
+result_glm_train_top15 <- results_train_method(train_top15, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_top15$results, 1))
+
 # with the top20 training set
-result_glm_train_top20 <- results_glm(train_top20)
-rmse_results <- result_glm_train_top20$results
-rmse_results %>% knitr::kable()
-importance <- varImp(result_glm_train_top20$train, scale=FALSE)
+result_glm_train_top20 <- results_train_method(train_top20, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_top20$results, 1))
+
+# with the top10 training set
+result_glm_train_top10 <- results_train_method(train_top10, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_top10$results, 1))
+
+# with the top10 training set on rank
+result_glm_train_top10_rank <- results_train_method(train_top10_rank, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_top10_rank$results, 1))
+rmse_results %>% 
+  filter(str_detect(method, '"glm"') ) %>% 
+  arrange(rmse) %>%
+  knitr::kable()
 ```
 
 I ran this for the top 10 to top 50 features, with the respective RMSEs for the GLM model, and plotted you can see that there is a steady decrease in RMSE, with a big drop at 23.  It is interesting to see that the overall trend is down, but adding a single feature can increase the RMSE, with the insight that sometimes having more information actually makes the estimate/prediction worse.
@@ -2012,6 +2168,7 @@ glm_top10_top50_tmp <- sapply(10:50, function(n){
   result_glm_train_topn <- results_train_method(train_topn, "glm")
   result_glm_train_topn$results[,2]
 })
+
 #extract the rmse values and put in a table
 glm_top10_top50 <- t(data.frame(glm_top10_top50_tmp)) %>%
   cbind(feature_no = 10:50)
@@ -2025,44 +2182,45 @@ data.frame(glm_top10_top50) %>%
   ylab("RMSE")
 ```
 
-I also tried this for the GBM algorithm.  This is a lot slower, so I focused on the top 14 to 40 features, incrementing by 2 each time.  This has a more steady decline with pretty good results around the 28 number.
+I also tried this for the SVM Radial algorithm.  This is a bit slower, so I focused on the top 20 to 40 features, incrementing by 2. This also drops quickly after 20, but flattening a bit around the 28 number.
 
-```{r plot of number of features vs y for GBM, eval=FALSE}
-# not running as it takes a while
-#apply to the top 15 to top 35 features
-gbm_top10_top40_tmp <- sapply(seq(10, 40, 2), function(n){
+```{r plot of number of features vs y for svm radial, eval=FALSE}
+#not running here due to the time taken
+# similar with svm radial
+#apply to the top 20 to top 40 features
+svmradial_top20_top40_tmp <- sapply(seq(20, 40, 2), function(n){
   print(paste("training with", n, "features"))
   train_topn <- topfeature_overall(n)
   print("running results function")
-  result_gbm_train_topn <- results_train_method(train_topn, "gbm")
-  result_gbm_train_topn$results[,2]
+  result_svmradial_train_topn <- results_train_method(train_topn, "svmRadial")
+  result_svmradial_train_topn$results[,2]
 })
 #extract the rmse values and put in a table
-gbm_top10_top40_tmp
-gbm_top10_top40 <- t(data.frame(gbm_top10_top40_tmp)) %>%
-  cbind(feature_no = seq(10, 40, 2))
-colnames(gbm_top10_top40) <- c("rmse", "feature_no")
+svmradial_top20_top40_tmp
+svmradial_top20_top40 <- t(data.frame(svmradial_top20_top40)) %>%
+  cbind(feature_no = seq(20, 40, 2))
+colnames(svmradial_top20_top40) <- c("rmse", "feature_no")
+svmradial_top20_top40
 ```
 
-```{r plot the rmse vs number of features for gbm}
+```{r plot the rmse vs number of features for svm radial}
 #load the calculation from file
-load("rda/gbm_top10_top40.rda")
+load("rda/svmradial_top20_top40.rda")
 #plot the values
-data.frame(gbm_top10_top40) %>%
+data.frame(svmradial_top20_top40) %>%
   ggplot(aes(x=feature_no, y=rmse)) +
   geom_line() +
-  ggtitle("Improvement in RMSE with number of features for GBM") +
+  ggtitle("Improvement in RMSE with number of features for SVM Radial") +
   xlab("number of features, in priority order") +
   ylab("RMSE")
 ```
 
-Similarly for the SVM algorithm, focusing on the top 10 to 40 features, incrementing by 2 each time.
+Similarly for the SVM algorithm, focusing on the top 20 to 40 features, incrementing by 2 each time.  This seems to have a drop around the 24/26 and then again around 32.
 
 ```{r running svm vs features, eval=FALSE}
 # not running as it takes a while
-# similar with SVM
-#apply to the top 10 to top 40 features
-svm_top10_top40_tmp <- sapply(seq(10, 40, 2), function(n){
+#apply to the top 20 to top 40 features
+svm_top20_top40_tmp <- sapply(seq(20, 40, 2), function(n){
   print(paste("training with", n, "features"))
   train_topn <- topfeature_overall(n)
   print("running results function")
@@ -2070,44 +2228,111 @@ svm_top10_top40_tmp <- sapply(seq(10, 40, 2), function(n){
   result_svm_train_topn$results[,2]
 })
 #extract the rmse values and put in a table
-svm_top10_top40_tmp
-svm_top10_top40 <- t(data.frame(svm_top10_top40_tmp)) %>%
-  cbind(feature_no = seq(10, 40, 2))
-colnames(svm_top10_top40) <- c("rmse", "feature_no")
+svm_top20_top40_tmp
+svm_top20_top40 <- t(data.frame(svm_top20_top40_tmp)) %>%
+  cbind(feature_no = seq(20, 40, 2))
+colnames(svm_top20_top40) <- c("rmse", "feature_no")
 svm_top10_top40
 ```
 
 ```{svm plot the features vs rmse}
 #load the calculation from file
-load("rda/svm_top10_top40.rda")
+load("rda/svm_top20_top40.rda")
 #plot the values
-data.frame(svm_top10_top40) %>%
+data.frame(svm_top20_top40) %>%
   ggplot(aes(x=feature_no, y=rmse)) +
   geom_line() +
-  ggtitle("Improvement in RMSE with number of features for SVM") +
+  ggtitle("Improvement in RMSE with number of features for SVM Linear") +
   xlab("number of features, in priority order") +
   ylab("RMSE")
 ```
 
-This indicates that the top 23 or 28 features have the biggest impact on the overall RMSE, so if we had to cut off, it would be around the 28 features number.
+This indicates that the top 23 to 28 features have the biggest impact on the overall RMSE.
 
 
-### Running on the other models
+### Training GAM and GAM loess with fewer features
 
-Running the top 28 features on the GAM model, and this has the best performance of any standalone model, even with only a subset of the features, with 0.015935  An ensemble with GAM would be an improvement.  It does include a feature importance, and here level4 qualification has infinite importance!
+I would like to try the GAM and GAM Loess again, which did not work with the "small" set of 35 features.  Therefore I am trying a cut off of 25 features.
 
-And similarly the GAM loess model worked with 28, with good results, with an RMSE of 0.016959, which puts it just in front of the SVM model in 3rd place.
+Running the top 25 features on the GAM model, this achieves an RMSE of 0.0161365, better than all but the SVM Radial model.
+
+I tried with the top 28 features, and this was better still, achieving an RMSE of 0.015935. It does include a feature importance, and here level4 qualification has infinite importance!
+
+```{r top28 gam}
+# running on GAM with 25 features
+train_top25 <- topfeature_overall(25)
+# with the train_top25 training set
+result_gam_train_top25 <- results_train_method(train_top25, "gam")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, tail(result_gam_train_top25$results, 1))
+rmse_results %>% knitr::kable()
+# checking the variable importance
+importance <- varImp(result_gam_train_top25$train, scale=FALSE)
+plot(importance, 20)
+# tidy
+save(result_gam_train_top25, file="rda/result_gam_train_top25.rda")
+rm(result_gam_train_top25)
+
+# running on GAM with 28 features
+train_top28 <- topfeature_overall(28)
+# with the train_top28 training set
+result_gam_train_top28 <- results_train_method(train_top28, "gam")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, tail(result_gam_train_top28$results, 1))
+rmse_results %>% knitr::kable()
+# tidy
+save(result_gam_train_top28, file="rda/result_gam_train_top28.rda")
+rm(result_gam_train_top28)
+
+#checking the overall performance
+rmse_results %>% 
+  arrange(rmse) %>%
+  knitr::kable() %>%
+  head(10)
+```
+
+And next, doing the same with the GAM loess model, using the top 28 features, producing good results, with an RMSE of 0.016959, which puts it just behind the SVM model in 5th place.
+
+```{r top 28 on the gam loess algorithm}
+# running on GAMloess with 28 features
+# with the train_top28 training set
+result_gamloess_train_top28 <- results_train_method(train_top28, "gamLoess")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, tail(result_gamloess_train_top28$results, 1))
+rmse_results %>% knitr::kable()
+# tidy
+save(result_gamLoess_train_top28, file="rda/result_gamLoess_train_top28.rda")
+rm(result_gamLoess_train_top28)
+```
+
+|method                            |      rmse|
+|:---------------------------------|---------:|
+|"svmRadial" - train_set_final     | 0.0145255|
+|"gam" - train_top28               | 0.0159350|
+|"glm" - train_set_final           | 0.0166809|
+|"svmLinear" - train_set_final     | 0.0167375|
+|"gamLoess" - train_top28          | 0.0169595|
+
 
 Although GAM and GAM Loess have similar source models using the gam package, their $\hat{y}$ estimates are quite different, so they can both be a useful addition to the ensemble.
 
 ```{r plots of gam vs gamloess}
 # comparing gam and gamloess
+y_hat_gam <- result_gam_train_top28$y_hat
+y_hat_gamLoess <- result_gamLoess_train_top28$y_hat
 data.frame(y_hat_gam, y_hat_gamLoess) %>%
-  ggplot(aes(y_hat_gam, y_hat_gamLoess)) + geom_point()
+  ggplot(aes(y_hat_gam, y_hat_gamLoess)) + 
+  geom_point() +
+  ggtitle("Comparing GAM vs GAM Loess predictions") +
+  xlab("GAM model predictions") +
+  ylab("GAM Loess model predictions")
 data.frame(y_hat_gam, y_hat_gamLoess) %>%
   mutate(delta = (y_hat_gam-y_hat_gamLoess)) %>%
   ggplot(aes(delta)) + 
-  geom_histogram(bins = 30) 
+  geom_histogram(bins = 30) +
+  ggtitle("Comparing GAM vs GAM Loess predictions") +
+  xlab("Delta between GAM and GAM Loess predictions") +
+  ylab("number of predictions in each interval")
 ```
 
 I tried on the KNN model, but although it was the best it had produced it is still some distance behind the leading models.
@@ -2123,6 +2348,7 @@ rmse_results <- bind_rows(rmse_results, tail(result_knn_train_top28_knn$results,
 rmse_results %>% knitr::kable()
 ```
 
+
 ### Final ensemble model
 
 Now looking at the top models, the best are GAM, GLM and SVM Linear, with GAM Loess nearly as good. 
@@ -2134,13 +2360,23 @@ rmse_results %>%
   arrange(rmse) %>% head(10) %>% knitr::kable()
 ```
 
-With an ensemble of the best four models, averaging the prediction, the result is better than any individual model, with a result of 0.015860, vs the GAM model of 0.015935.
+Creating an ensemble to include the GAM and GAM Loess just created,  with five models (GLM, SVM Linear, SVM Radial, GAM, GAM Loess), averaging the prediction, the result is an RMSE of 0.0149383, vs the GAM model of 0.0145255, and only slightly better than the last ensemble of three (GLM, SVM Linear, SVM Radial), which is maybe because the strong performance of the GAM is counterbalanced by the relatively poor GAM Loess.
 
-```{r ensemble with gam}
-# an ensemble of the best four models
-y_hat_ens_table3 <- data.frame(number = 1:length(y_hat_glm)) %>%
+```{r ensemble3 with best five models including gam gamloess}
+#loading the separate model information
+load("rda/result_glm_train_set_final.rda")
+load("rda/result_svm_train_set_final.rda")
+load("rda/result_svmradial_train_set_final.rda")
+load("rda/result_gam_train_top28.rda")
+load("rda/result_gamLoess_train_top28.rda")
+y_hat_glm <- result_glm_train_set_final$y_hat
+
+# an ensemble of the best five models
+y_hat_ens_table3 <- 
+  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
   cbind(data.frame(result_gam_train_top28$y_hat)) %>%
   cbind(data.frame(result_gamLoess_train_top28$y_hat)) %>%
   select(-number) %>%
@@ -2150,14 +2386,18 @@ head(y_hat_ens_table3)
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table3$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble3",  
-                                 rmse = rmse_ens))
+                          tibble(method="Ensemble3 glm, svm, svmRadial, gam, gamLoess", rmse = rmse_ens))
 rmse_results %>% knitr::kable()
+```
 
+Now creating an ensemble with the best three models, (GLM, SVM Radial, GAM), averaging the prediction, the result is an RMSE of 0.014395, vs the SVM Radial model of 0.0145255, so improving and now the best result overall.
+
+```{r ensemble4 with best three models}
 # an ensemble of the best three models
-y_hat_ens_table4 <- data.frame(number = 1:length(y_hat_glm)) %>%
+y_hat_ens_table4 <- 
+  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
-  cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
   cbind(data.frame(result_gam_train_top28$y_hat)) %>%
   select(-number) %>%
   #calculate average of the y_hats
@@ -2166,30 +2406,133 @@ head(y_hat_ens_table4)
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table4$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble4",  
+                          tibble(method="Ensemble4 svmRadial, gam, glm",  
                                  rmse = rmse_ens))
-rmse_results %>% knitr::kable()
+rmse_results %>%
+  arrange(rmse) %>% head(5) %>% knitr::kable()
 ```
 
-Interestingly, with an ensemble of three, only GAM, GLM and SVM Linear the result is slightly worse.
+Finally, creating an ensemble with the best two models, (SVM Radial and GAM), averaging the prediction, the result is an RMSE of 0.013991 which is a significant improvement over the previous ensemble and over the SVM Radial and GAM separately.  This is the final model for the best result for this project.
+
+```{r ensemble 5 svmRadial and gam}
+#ensemble of 2
+y_hat_ens_table5 <-
+  data.frame(number = 1:length(result_svmradial_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_gam_train_top28$y_hat)) %>%
+  select(-number) %>%
+  #calculate average of the y_hats
+  mutate(y_hat_ave = rowMeans(.))
+head(y_hat_ens_table4)
+#test against the actual values
+rmse_ens <- rmse(test_set_final$y, y_hat_ens_table5$y_hat_ave)
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Ensemble5 svmRadial, gam",  
+                                 rmse = rmse_ens))
+rmse_results %>%
+  arrange(rmse) %>% head(10) %>% knitr::kable()
+```
+
+
+|method                                       |     rmse|
+|:--------------------------------------------|--------:|
+|Ensemble5 svmRadial, gam                     | 0.013991|
+|Ensemble4 svmRadial, gam, glm                | 0.014395|
+|"svmRadial" - train_set_final                | 0.014525|
+|Ensemble3 glm, svm, svmRadial, gam, gamLoess | 0.014938|
+|Ensemble2 glm, svm, svmRadial                | 0.014962|
+|Ensemble glm, gbm, svm, svmRadial, avvnet    | 0.015556|
+|"gam" - train_top28                          | 0.015935|
+
 
 
 ### Analysis of errors
 
+From the graphs of SVM Radial, GAM and their ensemble, it is hard to draw out too much conclusion.  SVM Radial seems a bit tighter in general, but GAM better at the extremes.
+
+```{r graphs of y_hat vs y}
+# plot of y against y_hat for all three
+y_hat_ens_table5 %>%
+  cbind(y = test_set_final$y) %>%
+  rename(ensemble_y_hat=y_hat_ave) %>%
+  pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
+  ggplot(aes(x=y_hat, y=y, col=model)) +
+  geom_point() +  
+  geom_abline(slope = 1, intercept = 0, col="black") +
+  facet_grid(. ~model) +
+  ggtitle("Comparing ensemble5 predictions vs the outcome y") +
+  xlab("model predictions") +
+  ylab("actual values, y") + 
+  theme(legend.position = "bottom")
+```
+
+Looking at the histograms, it tells a similar story, which explains why the ensemble is better, as GAM is helping improve the extreme results for SVM Radial.
+
+```{r histograms of errors}
+# histogram of deltas for all three
+y_hat_ens_table5 %>%
+  cbind(y = test_set_final$y) %>%
+  mutate(svmradial_delta = (y-svmradial_y_hat)) %>%
+  mutate(gam_delta = (y-gam_y_hat)) %>%
+  mutate(ensemble_delta = (y-y_hat_ave)) %>%
+  select(-svmradial_y_hat, -gam_y_hat, -y_hat_ave) %>%
+  pivot_longer(cols=contains("delta"), names_to="model", values_to="delta") %>%
+  ggplot(aes(delta, fill=model)) +
+  geom_histogram(bins = 30) +
+  facet_grid(. ~model) +
+  ggtitle("Comparing ensemble5 predictions vs the outcome y") +
+  xlab("delta between y and the model predictions") +
+  ylab("number of predictions in each interval") +
+  theme(legend.position = "bottom")
+```
+
+And this graph illustrates the same, with the colours representing the models, and GAM seems to surround SVM radial, apart from the outliers (large difference, and high y value).
+
+```{r graph comparing gam and svm radial}
+# comparing the svmradial and gam models
+y_hat_ens_table5 %>%
+  cbind(y = test_set_final$y) %>%
+  select(-y_hat_ave) %>%
+  pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
+  ggplot(aes(x=y_hat, y=y, col=model)) +
+  geom_point()  +
+  geom_abline(slope = 1, intercept = 0, col="black") +
+  ggtitle("Comparing gam and svm radial predictions vs the outcome y") +
+  xlab("model predictions") +
+  ylab("actual values, y") 
+```
 
 
-hist of best standalone model vs y
-hist of ensemble vs y
+# Final model
+
+The final model is an ensemble of SVM Radial, using all of the features and GAM using the top 28 features, where the features are prioritised based on the normalised importance scores from the GLM, GBM and GLM boost models.
+
+Both of these require quite a lot of computation, with GAM particularly slow.  This may be a problem with larger data sets, say, using the full SOA data, and may lead to needing to reduce the number of features further.
+
+
+## MSOA with Main / validation
+
 
 
 ## Running the models with the SOA data
 
 
 
-# Results
-<!-- a results section that presents the modeling results and discusses the model performance; and -->
+# Model interpretation and feature importance
 
-The optimal result was from an ensemble, and by carefully choosing features to increase the numbers of models able to work with them, as many models appear to struggle with a large number of features.
+## Importance 
+Running the model without qualifications, looking for importance
+
+## Importance without qualification
+
+## Correlation of features
+
+# Results
+<!-- a results section that presents the modeling results and discusses the model performance  -->
+
+The optimal result was from an ensemble of two models, one of which needed a reduction of numbers of features in order to complete the calculations.
+
+Many models appear to struggle with a large number of features, but on the other hand, the more features the better the model performance for the leading models.
 
 The best models were linear regression, and variants of random forest / gradient boosting.  The latter seemed to work quite well, but computationally expensive.
 
@@ -2206,9 +2549,12 @@ Look at features, important features, correlations
 
 ## Modelling conclusions
 
-There are a lot of models and algorithms, and each could be tuned, a huge amount of potential detail for each one.  This study tended to focus on the data and features, unsurprising given extensive work carried out to prepare that.  It used many models, but only had a quick look at each one, without going in to depth to tune each model.
+There are a lot of models and algorithms, and each could be tuned, a huge amount of potential detail for each one.  This study tended to focus on the data and features - unsurprising given extensive work carried out to prepare the data.  My approach was to try many models, but without going in to depth to tune each model.
+
+In general the approach to the modelling was empirical, as in trying a wide variety and then focusing down on to the ones that worked the best.  This seemed to work, although there are a large number of models that have not been tried and could be better.
 
 The "high correlation" function in caret did not work well at helping feature selection, as some of the listed highly correlated features were the key ones.  Feature importance seemed much more effective in use.
+
 
 ## Implications from the modelling
 
@@ -2223,10 +2569,14 @@ By far and away the most important element for high quality occupation is qualif
 
 From a modelling perspective, it would be good to focus on one or two algorithms and see how far the models can be optimised to improve the performance - will it outperform an ensemble?
 
+Also, there are many models which were not tried, it would be good to move beyond the empirical approach and to use some logic for selecting specific models for this data set, and focus that way.
+
+Similarly, for the number of features per model, this could be carried out in a less arbitrary way, by say, the computation time vs performance, to deliver an optimal point.  Also comparing models to each other could include the computation time to identify which models deliver RMSE performance more efficiently, and this be used as part of the reason for selecting models.  This is particularly relevant if the models are selected on smaller sets before being run on larger pieces of data.
+
+
 ### Societal implications
 
-This study was to focus on machine learning, but it would be interesting to extend the work to look at the correlation between the different factors.  For example, Jewish ethnicities are positively correlated and Pakistini and Bangladeshi are negatively, and this could be due to education and qualifications (the press mentions the poor school outcomes for some ethinicities), and it would be interesting to investigate which are convoluted and which are causal in terms of drivers.
-
+This study was to focus on machine learning, but it would be interesting to extend the work to look at the correlation between the different factors.  For example, "Jewish" ethnicities are positively correlated and "Pakistini" and "Bangladeshi" are negatively, and this could be due to education and qualifications (the press mentions the poor school outcomes for some ethinicities), and it would be interesting to investigate which are convoluted and which are causal in terms of drivers.
 
 
 

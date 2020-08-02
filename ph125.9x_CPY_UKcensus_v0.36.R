@@ -6,11 +6,11 @@ setwd("~/Documents/study/Data-Science-R/ph125.9.Capstone/ChooseYourOwn")
 # raw data in ./data, R objects in ./rda
 # set up libraries
 library(tidyverse)
-library(ggplot2)
+# library(ggplot2)
 library(stringr)
-library(rvest) #html parsing
-library(tidyr)
-library(purrr)
+library(rvest)
+# library(tidyr)
+# library(purrr)
 library(caret)
 options(digits = 6)
 
@@ -1546,6 +1546,7 @@ save(train_final_nocat, file="rda/train_final_nocat.rda")
 rm(rmse_ave, mu_hat, index, correlationmatrix, low_variability)
 rm(train_small)
 
+#### function for running the models ####
 # creating a function to run the models, with different algorithms and data sets, with default settings.
 results_train_method <- function(traindata, algorithm){
   trainname <- paste("train", deparse(substitute(algorithm)), deparse(substitute(traindata)), sep = "_")
@@ -1781,7 +1782,7 @@ rm(result_rpart_train_smaller, importance, result_rpart_train_small)
 rm(result_rpart_train_set_final)
 
 
-#### Support Vector Machines (SVM) - svmLinear ####
+#### Support Vector Machines - svmLinear ####
 # using the kernlab package
 if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
 
@@ -2257,7 +2258,7 @@ rm(result_avnnet_train_small, result_avnnet_train_smaller)
 rm(result_avnnet_train_final_nocat, result_avnnet_train_set_final)
 
 
-#### Support Vector Machines with Linear Kernel	svmLinear2 ####
+#### Support Vector Machines with Linear Kernel	- svmLinear2 ####
 # uses the e1071 package
 if (!require('e1071')) install.packages('e1071'); library('e1071')
 
@@ -2320,14 +2321,18 @@ rm(result_svm2_train_final_nocat, result_svm2_train_set_final)
 rm(y_hat_svm, y_hat_svm2)
 
 
-##### other #####
-# svm radial
+##### Support Vector Machines with Linear Kernel - svmRadial #####
+# uses package kernlab
+if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
+
 # with the smaller training set
 result_svmradial_train_smaller <- results_train_method(train_smaller, "svmRadial")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_svmradial_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
+#checking the variable importance, not here
+importance <- varImp(result_svmradial_train_smaller$train, scale=FALSE)
 
 # with the small training set
 result_svmradial_train_small <- results_train_method(train_small, "svmRadial")
@@ -2343,81 +2348,73 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_svmradial_train_final_nocat$results, 1))
 rmse_results %>% knitr::kable()
 
-
-
-# kknn
-# uses the kknn package
-if (!require('kknn')) install.packages('kknn'); library('kknn')
-
-# with the smaller training set
-result_kknn_train_smaller <- results_train_method(train_smaller, "kknn")
+# with the full train set
+result_svmradial_train_set_final <- results_train_method(train_set_final, "svmRadial")
+# extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
-                          tail(result_kknn_train_smaller$results, 1))
+                          tail(result_svmradial_train_set_final$results, 1))
 rmse_results %>% knitr::kable()
 
-
-# with the full train set, less categorical
-result_kknn_train_final_nocat <- results_train_method(train_final_nocat, "kknn")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, 
-                          tail(result_kknn_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
-
-
-#check with the new knn small training set
-result_knn_train_set_kknn_small <- results_train_method(train_set_knn_small, "kknn")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, 
-                          tail(result_knn_train_set_kknn_small$results, 1))
-rmse_results %>% knitr::kable()
-
-
-
-train_set_knn_final_nocat
-
+#tidy 
+save(result_svmradial_train_set_final, file="rda/result_svmradial_train_set_final.rda")
+save(rmse_results, file="rda/rmse_results.rda")
+rm(result_svmradial_train_smaller, result_svmradial_train_small)
+rm(result_svmradial_train_final_nocat)
+rm(result_svmradial_train_set_final)
 
 ##### ensemble   #####
 # Identify the leading models, the top 5
 rmse_results %>%
   arrange(rmse) %>% head(15) %>% knitr::kable()
 # create an ensemble y hats
-y_hat_ens_table <- data.frame(number = 1:length(y_hat_glm)) %>%
-  cbind(data.frame(y_hat_glm)) %>%
-  cbind(data.frame(y_hat_gbm)) %>%
-  cbind(data.frame(y_hat_svm)) %>%
-  cbind(data.frame(y_hat_ranger)) %>%
-  cbind(data.frame(y_hat_avnnet)) %>%
+load("rda/result_glm_train_set_final.rda")
+load("rda/result_svm_train_set_final.rda")
+load("rda/result_svmradial_train_set_final.rda")
+load("rda/result_gbm_train_set_final.rda")
+load("rda/result_avnnet_train_set_final.rda")
+result_gbm_train_set_final$y_hat
+# create table of y_hat
+y_hat_ens_table <- 
+  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_gbm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_avnnet_train_set_final$y_hat)) %>%
   select(-number) %>%
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble",  
+                          tibble(method="Ensemble glm, gbm, svm, svmRadial, avvnet",  
                                  rmse = rmse_ens))
-rmse_results %>% knitr::kable()
+rmse_results %>% tail(5) %>% knitr::kable()
 
+#### ensemble 2 ####
 #a smaller ensemble of the three best models
-y_hat_ens_table2 <- data.frame(number = 1:length(y_hat_glm)) %>%
-  cbind(data.frame(y_hat_glm)) %>%
-  cbind(data.frame(y_hat_gbm)) %>%
-  cbind(data.frame(y_hat_svm)) %>%
+y_hat_ens_table2 <- 
+  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
   select(-number) %>%
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table2$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble2",  
+                          tibble(method="Ensemble2 glm, svm, svmRadial",  
                                  rmse = rmse_ens))
-rmse_results %>% knitr::kable()
+rmse_results %>% tail(5) %>% knitr::kable()
 
 # tidy up
 save(y_hat_ens_table2, file="rda/y_hat_ens_table2.rda")
 save(rmse_results, file="rda/rmse_results.rda")
+rm(y_hat_ens_table2, rmse_ens, y_hat_ens_table)
+rm(result_avnnet_train_set_final, result_gbm_train_set_final)
 
-
-#### feature selection ####
+#### feature prioritisation ####
 
 # other promising models, looks like GAM, GAMloess and KNN could be interesting
 rmse_results %>%
@@ -2429,29 +2426,28 @@ load("rda/importance_gbm.rda")
 load("rda/importance_glm.rda")
 load("rda/importance_glmboost.rda")
 #create ranking for gbm algorithm, with normalised score
-gbm_rank <- 
-  data.frame(gbm_rank = 1:length(importance_gbm$importance$Overall)) %>%
-  cbind(arrange(importance_gbm$importance, desc(Overall))) %>%
-  rownames_to_column(var="feature") %>%
-  mutate("gbm_overall" = Overall/max(Overall)) %>%
+gbm_rank <- importance_gbm$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(gbm_rank = 1:length(importance_gbm$importance$Overall))) %>%
+  mutate("gbm_overall" = Overall/max(Overall)) %>% 
   select(-Overall)
 head(gbm_rank)
 #create ranking for glm algorithm, with normalised score
-glm_rank <- 
-  data.frame(glm_rank = 1:length(importance_glm$importance$Overall)) %>%
-  cbind(arrange(importance_glm$importance, desc(Overall))) %>%
-  rownames_to_column(var="feature") %>%
-  mutate("glm_overall" = Overall/max(Overall)) %>%
+glm_rank <- importance_glm$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(glm_rank = 1:length(importance_glm$importance$Overall))) %>%
+  mutate("glm_overall" = Overall/max(Overall)) %>% 
   select(-Overall)
 head(glm_rank)
 #create ranking for glmboost algorithm, with normalised score
-glmboost_rank <- 
-  data.frame(glmboost_rank = 1:length(importance_glmboost$importance$Overall)) %>%
-  cbind(arrange(importance_glmboost$importance, desc(Overall))) %>%
-  rownames_to_column(var="feature") %>%
-  mutate("glmboost_overall" = Overall/max(Overall)) %>%
+glmboost_rank <- importance_glmboost$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(glmboost_rank = 1:length(importance_glmboost$importance$Overall))) %>%
+  mutate("glmboost_overall" = Overall/max(Overall)) %>% 
   select(-Overall)
-head(glmboost_rank)
 
 # combined ranking table, with mean, and reordered
 feature_rank <- glm_rank %>%
@@ -2491,10 +2487,11 @@ ylab("feature values")
 data.frame(cor(train_set_final)) %>%
   select(y) %>%
   rownames_to_column(var="feature") %>%
-  filter(feature %in% feature_top15) %>% 
+  filter(feature %in% feature_top9) %>% 
   arrange(desc(abs(y))) %>%
   knitr::kable()
 
+# looking at the rmse with numbers of features
 #creating a function to choose the top n features, based on overall score
 topfeature_overall <- function(topn){
   feature_n <- feature_rank %>% 
@@ -2535,28 +2532,34 @@ rm(importance, importance_gbm, importance_glm, importance_glmboost)
 
 # running on the GLM model
 # with the top15 training set
-result_glm_train_top15 <- results_glm(train_top15)
-load("rda/rmse_results.rda")
-rmse_results <- result_glm_train_top15$results
+result_glm_train_top15 <- results_train_method(train_top15, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_top15$results, 1))
 rmse_results %>% knitr::kable()
-#checking the variable importance
-importance <- varImp(result_glm_train_top15$train, scale=FALSE)
-plot(importance, 20)
 # with the top20 training set
-result_glm_train_top20 <- results_glm(train_top20)
-rmse_results <- result_glm_train_top20$results
+result_glm_train_top20 <- results_train_method(train_top20, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_top20$results, 1))
 rmse_results %>% knitr::kable()
-importance <- varImp(result_glm_train_top20$train, scale=FALSE)
+
 # with the top10 training set
-result_glm_train_top10 <- results_glm(train_top10)
-rmse_results <- result_glm_train_top10$results
+result_glm_train_top10 <- results_train_method(train_top10, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_top10$results, 1))
 rmse_results %>% knitr::kable()
+
 # with the top10 training set on rank
-result_glm_train_top10_rank <- results_glm(train_top10_rank)
-rmse_results <- result_glm_train_top10_rank$results
-rmse_results %>% knitr::kable()
-# with the top30 training set
-result_glm_train_top30 <- results_glm(train_top30)
+result_glm_train_top10_rank <- results_train_method(train_top10_rank, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_top10_rank$results, 1))
+rmse_results %>% 
+  filter(str_detect(method, '"glm"') ) %>% 
+  arrange(rmse) %>%
+  knitr::kable()
 
 # running with features from top 10 to top 50 say
 #set up the RMSE table
@@ -2569,6 +2572,7 @@ glm_top10_top50_tmp <- sapply(10:50, function(n){
   result_glm_train_topn <- results_train_method(train_topn, "glm")
   result_glm_train_topn$results[,2]
 })
+
 #extract the rmse values and put in a table
 glm_top10_top50 <- t(data.frame(glm_top10_top50_tmp)) %>%
   cbind(feature_no = 10:50)
@@ -2581,34 +2585,34 @@ data.frame(glm_top10_top50) %>%
   xlab("number of features, in priority order") +
   ylab("RMSE")
 
-# similar with GBM
-#apply to the top 15 to top 35 features
-gbm_top10_top40_tmp <- sapply(seq(10, 40, 2), function(n){
+# similar with svm radial
+#apply to the top 20 to top 40 features
+svmradial_top20_top40_tmp <- sapply(seq(20, 40, 2), function(n){
   print(paste("training with", n, "features"))
   train_topn <- topfeature_overall(n)
   print("running results function")
-  result_gbm_train_topn <- results_train_method(train_topn, "gbm")
-  result_gbm_train_topn$results[,2]
+  result_svmradial_train_topn <- results_train_method(train_topn, "svmRadial")
+  result_svmradial_train_topn$results[,2]
 })
 #extract the rmse values and put in a table
-gbm_top10_top40_tmp
-gbm_top10_top40 <- t(data.frame(gbm_top10_top40_tmp)) %>%
-  cbind(feature_no = seq(10, 40, 2))
-colnames(gbm_top10_top40) <- c("rmse", "feature_no")
-gbm_top10_top40
+svmradial_top20_top40_tmp
+svmradial_top20_top40 <- t(data.frame(svmradial_top20_top40_tmp)) %>%
+  cbind(feature_no = seq(20, 40, 2))
+colnames(svmradial_top20_top40) <- c("rmse", "feature_no")
+svmradial_top20_top40
 #load the calculation from file
-load("rda/gbm_top10_top40.rda")
+# load("rda/svmradial_top20_top40.rda")
 #plot the values
-data.frame(gbm_top10_top40) %>%
+data.frame(svmradial_top20_top40) %>%
   ggplot(aes(x=feature_no, y=rmse)) +
   geom_line() +
-  ggtitle("Improvement in RMSE with number of features for GBM") +
+  ggtitle("Improvement in RMSE with number of features for SVM Radial") +
   xlab("number of features, in priority order") +
   ylab("RMSE")
 
 # similar with SVM
-#apply to the top 10 to top 40 features
-svm_top10_top40_tmp <- sapply(seq(10, 40, 2), function(n){
+#apply to the top 20 to top 40 features
+svm_top20_top40_tmp <- sapply(seq(20, 40, 2), function(n){
   print(paste("training with", n, "features"))
   train_topn <- topfeature_overall(n)
   print("running results function")
@@ -2616,16 +2620,16 @@ svm_top10_top40_tmp <- sapply(seq(10, 40, 2), function(n){
   result_svm_train_topn$results[,2]
 })
 #extract the rmse values and put in a table
-svm_top10_top40_tmp
-svm_top10_top40 <- t(data.frame(svm_top10_top40_tmp)) %>%
-  cbind(feature_no = seq(10, 40, 2))
-colnames(svm_top10_top40) <- c("rmse", "feature_no")
-svm_top10_top40
+svm_top20_top40_tmp
+svm_top20_top40 <- t(data.frame(svm_top20_top40_tmp)) %>%
+  cbind(feature_no = seq(20, 40, 2))
+colnames(svm_top20_top40) <- c("rmse", "feature_no")
+svm_top20_top40
 
 #load the calculation from file
-load("rda/svm_top10_top40.rda")
+# load("rda/svm_top20_top40.rda")
 #plot the values
-data.frame(svm_top10_top40) %>%
+data.frame(svm_top20_top40) %>%
   ggplot(aes(x=feature_no, y=rmse)) +
   geom_line() +
   ggtitle("Improvement in RMSE with number of features for SVM") +
@@ -2633,14 +2637,28 @@ data.frame(svm_top10_top40) %>%
   ylab("RMSE")
 
 save(glm_top10_top50, file="rda/glm_top10_top50.rda")
-save(gbm_top10_top40, file="rda/gbm_top10_top40.rda")
-save(svm_top10_top40, file="rda/svm_top10_top40.rda")
-rm(svm_top10_top40, svm_top10_top40_tmp)
-rm(gbm_top10_top40, gbm_top10_top40_tmp)
+save(svmradial_top20_top40, file="rda/svmradial_top20_top40.rda")
+save(svm_top20_top40, file="rda/svm_top20_top40.rda")
+rm(svm_top20_top40, svm_top20_top40_tmp)
+rm(svmradial_top20_top40, svmradial_top20_top40_tmp)
 rm(glm_top10_top50, glm_top10_top50_tmp)
+load("rda/svmradial_top20_top40.rda")
 
+#### gam and gam loess again ####
 
-#### ensemble 2 ####
+# running on GAM with 25 features
+train_top25 <- topfeature_overall(25)
+# with the train_top25 training set
+result_gam_train_top25 <- results_train_method(train_top25, "gam")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, tail(result_gam_train_top25$results, 1))
+rmse_results %>% knitr::kable()
+# checking the variable importance
+importance <- varImp(result_gam_train_top25$train, scale=FALSE)
+plot(importance, 20)
+# tidy
+save(result_gam_train_top25, file="rda/result_gam_train_top25.rda")
+rm(result_gam_train_top25)
 
 # running on GAM with 28 features
 train_top28 <- topfeature_overall(28)
@@ -2649,11 +2667,6 @@ result_gam_train_top28 <- results_train_method(train_top28, "gam")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, tail(result_gam_train_top28$results, 1))
 rmse_results %>% knitr::kable()
-# checking the variable importance
-importance <- varImp(result_gam_train_top28$train, scale=FALSE)
-plot(importance, 20)
-#checking the y_hat
-y_hat_gam <- result_gam_train_top28$y_hat
 # tidy
 save(result_gam_train_top28, file="rda/result_gam_train_top28.rda")
 rm(result_gam_train_top28)
@@ -2664,13 +2677,16 @@ result_gamloess_train_top28 <- results_train_method(train_top28, "gamLoess")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, tail(result_gamloess_train_top28$results, 1))
 rmse_results %>% knitr::kable()
-#checking the y_hat
-y_hat_gamLoess <- result_gamLoess_train_top28$y_hat
 # tidy
 save(result_gamLoess_train_top28, file="rda/result_gamLoess_train_top28.rda")
 rm(result_gamLoess_train_top28)
 
+#checking the overall performance
+rmse_results %>% arrange(rmse) %>% head(10) %>%   knitr::kable() 
+
 # comparing gam and gamloess
+y_hat_gam <- result_gam_train_top28$y_hat
+y_hat_gamLoess <- result_gamLoess_train_top28$y_hat
 data.frame(y_hat_gam, y_hat_gamLoess) %>%
   ggplot(aes(y_hat_gam, y_hat_gamLoess)) + 
   geom_point() +
@@ -2694,22 +2710,28 @@ result_knn_train_top28_knn <- results_train_method(train_top28_knn, "knn")
 rmse_results <- bind_rows(rmse_results, tail(result_knn_train_top28_knn$results, 1))
 rmse_results %>% knitr::kable()
 
+
+#### ensemble 3 ####
 # updating the ensemble with the new models
 # Identify the leading models, the new top 5
+# load("rda/rmse_results.rda")
 rmse_results %>%
-  arrange(rmse) %>% head(10) %>% knitr::kable()
+  arrange(rmse) %>% head(20) %>% knitr::kable()
 
 #loading the separate model information
 load("rda/result_glm_train_set_final.rda")
 load("rda/result_svm_train_set_final.rda")
+load("rda/result_svmradial_train_set_final.rda")
 load("rda/result_gam_train_top28.rda")
 load("rda/result_gamLoess_train_top28.rda")
 y_hat_glm <- result_glm_train_set_final$y_hat
 
-# an ensemble of the best four models
-y_hat_ens_table3 <- data.frame(number = 1:length(y_hat_glm)) %>%
+# an ensemble of the best five models
+y_hat_ens_table3 <- 
+  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
   cbind(data.frame(result_gam_train_top28$y_hat)) %>%
   cbind(data.frame(result_gamLoess_train_top28$y_hat)) %>%
   select(-number) %>%
@@ -2719,14 +2741,15 @@ head(y_hat_ens_table3)
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table3$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble3",  
-                                 rmse = rmse_ens))
+                          tibble(method="Ensemble3 glm, svm, svmRadial, gam, gamLoess", rmse = rmse_ens))
 rmse_results %>% knitr::kable()
 
+#### ensemble 4 ####
 # an ensemble of the best three models
-y_hat_ens_table4 <- data.frame(number = 1:length(y_hat_glm)) %>%
+y_hat_ens_table4 <- 
+  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
-  cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
   cbind(data.frame(result_gam_train_top28$y_hat)) %>%
   select(-number) %>%
   #calculate average of the y_hats
@@ -2735,60 +2758,139 @@ head(y_hat_ens_table4)
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table4$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble4",  
+                          tibble(method="Ensemble4 svmRadial, gam, glm",  
                                  rmse = rmse_ens))
-rmse_results %>% knitr::kable()
+rmse_results %>%
+  arrange(rmse) %>% head(10) %>% knitr::kable()
+
+#### ensemble 5 ####
+#ensemble of 2
+y_hat_ens_table5 <- 
+  data.frame(svmradial_y_hat = result_svmradial_train_set_final$y_hat, 
+             gam_y_hat = result_gam_train_top28$y_hat) %>%
+  #calculate average of the y_hats
+  mutate(y_hat_ave = rowMeans(.))
+#test against the actual values
+rmse_ens <- rmse(test_set_final$y, y_hat_ens_table5$y_hat_ave)
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Ensemble5 svmRadial, gam",  
+                                 rmse = rmse_ens))
+rmse_results %>%
+  arrange(rmse) %>% head(10) %>% knitr::kable()
+rmse_results %>%
+  arrange(rmse) %>% head(20) %>% knitr::kable()
+
+# tidy up
+save(y_hat_ens_table5, file="rda/y_hat_ens_table5.rda")
+save(rmse_results, file="rda/rmse_results.rda")
+rm(y_hat_ens_table3, rmse_ens, y_hat_ens_table4)
+rm(y_hat_ens_table5)
+rm(result_gamLoess_train_top28, result_svm_train_set_final)
 
 
 #### Investigation and visualisation of errors ####
-# looking at the best standalone model, gam
-# plot of y against y_hat
-data.frame(y_hat = result_gam_train_top28$y_hat, y = test_set_final$y) %>%
-  ggplot(aes(x=y_hat, y=y)) +
-  geom_point() +
-  ggtitle("Comparing GAM predictions vs the outcome y") +
-  xlab("GAM model predictions") +
-  ylab("actual values")
-# histogram of deltas
-data.frame(y_hat = result_gam_train_top28$y_hat, y = test_set_final$y) %>%
-  mutate(delta = (y-y_hat)) %>%
-  ggplot(aes(delta)) + 
-  geom_histogram(bins = 30) +
-  ggtitle("Comparing GAM predictions vs the outcome y") +
-  xlab("Delta between y and the GAM predictions") +
-  ylab("number of predictions in each interval")
+# looking at the best ensemble model, and constituent ones svmRadial and gam
+# plot of y against y_hat for all three
+y_hat_ens_table5 %>%
+  cbind(y = test_set_final$y) %>%
+  rename(ensemble_y_hat=y_hat_ave) %>%
+  pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
+  ggplot(aes(x=y_hat, y=y, col=model)) +
+  geom_point() +  
+  geom_abline(slope = 1, intercept = 0, col="black")  +
+  facet_grid(. ~model) +
+  ggtitle("Comparing ensemble5 predictions vs the outcome y") +
+  xlab("model predictions") +
+  ylab("actual values, y") + 
+  theme(legend.position = "bottom")
 
-# looking at the best ensemble model, y_hat_ens_table3
-# plot of y against y_hat
-data.frame(y_hat = y_hat_ens_table3$y_hat_ave, y = test_set_final$y) %>%
-  ggplot(aes(x=y_hat, y=y)) +
-  geom_point() +
-  ggtitle("Comparing ensemble3 predictions vs the outcome y") +
-  xlab("ensemble3 model predictions") +
-  ylab("actual values")
-# histogram of deltas
-data.frame(y_hat = y_hat_ens_table3$y_hat_ave, y = test_set_final$y) %>%
-  mutate(delta = (y-y_hat)) %>%
-  ggplot(aes(delta)) + 
+# histogram of deltas for all three
+y_hat_ens_table5 %>%
+  cbind(y = test_set_final$y) %>%
+  mutate(svmradial_delta = (y-svmradial_y_hat)) %>%
+  mutate(gam_delta = (y-gam_y_hat)) %>%
+  mutate(ensemble_delta = (y-y_hat_ave)) %>%
+  select(-svmradial_y_hat, -gam_y_hat, -y_hat_ave) %>%
+  pivot_longer(cols=contains("delta"), names_to="model", values_to="delta") %>%
+  ggplot(aes(delta, fill=model)) +
   geom_histogram(bins = 30) +
-  ggtitle("Comparing ensemble3 predictions vs the outcome y") +
-  xlab("Delta between y and the ensemble3 predictions") +
-  ylab("number of predictions in each interval")
+  facet_grid(. ~model) +
+  ggtitle("Comparing ensemble5 predictions vs the outcome y") +
+  xlab("delta between y and the model predictions") +
+  ylab("number of predictions in each interval") +
+  theme(legend.position = "bottom")
 
-largest_errors <- data.frame(y_hat = y_hat_ens_table3$y_hat_ave, 
-           y = test_set_final$y,
-           area_code = test_set_final$area_code) %>%
-  mutate(delta = (y-y_hat)) %>%
-  arrange(desc(delta)) %>%
+# comparing the svmradial and gam models
+y_hat_ens_table5 %>%
+  cbind(y = test_set_final$y) %>%
+  select(-y_hat_ave) %>%
+  pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
+  ggplot(aes(x=y_hat, y=y, col=model)) +
+  geom_point()  +
+  geom_abline(slope = 1, intercept = 0, col="black") +
+  ggtitle("Comparing gam and svm radial predictions vs the outcome y") +
+  xlab("model predictions") +
+  ylab("actual values, y") 
+
+# looking at the largest errors
+largest_errors <- y_hat_ens_table5 %>%
+  cbind(y = test_set_final$y) %>%
+  cbind(area_code = test_set_final$area_code) %>%
+  mutate(delta = (y-y_hat_ave)) %>%
+  arrange(desc(abs(delta))) %>%
   head(20) %>%
   left_join(test_set_final)
 names(largest_errors)
+head(largest_errors, 20)
+
+
+#### running on the validation / main set ####
+
+# writing the code for the overall model to run
+
+#run on the test set and train set
+# load the files
+load("rda/geo_lookup.rda")
+load("rda/main.rda")
+load("rda/validation.rda")
+#cleanse the data, add the geo info
+main_clean <- data_cleanse(main)
+validation_clean <- data_cleanse(validation)
+#check
+names(main_clean)
+names(validation_clean)
+head(main_clean)
+head(validation_clean)
+sum(is.na(main_clean))
+# tidy up
+save(main_clean, file="rda/main_clean.rda")
+save(validation_clean, file="rda/validation_clean.rda")
+rm(geo_mapping, tmp, tmp1)
+# create baseline
+mu_hat <- mean(main_clean$y)
+rmse_ave <- rmse(validation_clean$y, mu_hat)
+rmse_results <- tibble(method = "Mean on validation", rmse = rmse_ave)
+rmse_results %>% knitr::kable()
 
 
 
 
 
-## working code
+#### running on the SOA  #####
+
+
+
+#### feature importance ####
+
+
+
+
+#### running without the qualification features ####
+
+
+
+
+#### working code ####
 
 
 # show the p value in addition to correlation
