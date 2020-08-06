@@ -1548,7 +1548,7 @@ rm(train_small)
 
 #### function for running the models ####
 # creating a function to run the models, with different algorithms and data sets, with default settings.
-results_train_method <- function(traindata, algorithm){
+results_train_method <- function(traindata, testdata, algorithm){
   trainname <- paste("train", deparse(substitute(algorithm)), deparse(substitute(traindata)), sep = "_")
   print(paste0("running ", trainname))
   #setting the random seed
@@ -1556,9 +1556,9 @@ results_train_method <- function(traindata, algorithm){
   #run the model training on the training data
   train_obj <- train(y ~ ., method = algorithm, data = traindata)
   # making a prediction on the test set
-  yhat_obj <- predict(train_obj, test_set_final)
+  yhat_obj <- predict(train_obj, testdata)
   # calculating the rmse
-  rmse_obj <- rmse(test_set_final$y, yhat_obj)
+  rmse_obj <- rmse(testdata$y, yhat_obj)
   print(paste("rmse result is", rmse_obj))
   #adding to the RMSE list
   resultname <- paste0(deparse(substitute(algorithm)), " - ", deparse(substitute(traindata)))
@@ -1579,11 +1579,11 @@ load("rda/test_set_final.rda")
 load("rda/train_set_final.rda")
 
 
-#### Generalized linear model (GLM) ####
+#### Generalized linear model - glm ####
 # initial the straightforward glm model
-
 # with the smaller training set
-result_glm_train_smaller <- results_train_method(train_smaller, "glm")
+result_glm_train_smaller <- 
+  results_train_method(train_smaller, test_set_final,"glm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_glm_train_smaller$results, 1))
@@ -1593,7 +1593,8 @@ importance <- varImp(result_glm_train_smaller$train, scale=FALSE)
 plot(importance, 20)
 
 # with the small train set
-result_glm_train_small <- results_train_method(train_small, "glm")
+result_glm_train_small <- 
+  results_train_method(train_small, test_set_final, "glm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_glm_train_small$results, 1))
@@ -1603,7 +1604,8 @@ importance <- varImp(result_glm_train_small$train, scale=FALSE)
 plot(importance, 20)
 
 # with the full train set, less categorical
-result_glm_train_final_nocat <- results_train_method(train_final_nocat, "glm")
+result_glm_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "glm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_glm_train_final_nocat$results, 1))
@@ -1612,11 +1614,33 @@ rmse_results %>% knitr::kable()
 importance <- varImp(result_glm_train_final_nocat$train, scale=FALSE)
 plot(importance, 20)
 
+# test if it will work with categorical feature the the smaller_cat
+train_glm <- train(y ~ ., method = "glm", data = train_smaller_cat)
+# glm does work...
+
+# with the full train set
+result_glm_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_set_final$results, 1))
+rmse_results %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_glm_train_set_final$train, scale=FALSE)
+plot(importance, 20)
+importance$importance
+
 #plotting important features vs y
 # important_features <- c("level4_25_64", "age_median", "oneperson_25_64", "loneparent_25_6", "cohoabiting_25_64", "construction_25_64",  "eu_rest_25_64")
-important_features <- c("level4", "age_median", "loneparent", "cohoabiting", "construction",  "eu_rest", "no_qual",  "bangladeshi", "black_african")
+# important_features <- c("level4", "age_median", "loneparent", "cohoabiting", "construction",  "eu_rest", "no_qual",  "bangladeshi", "black_african")
+important_features <- data.frame(importance$importance) %>%
+  rownames_to_column(var="feature") %>%
+  mutate(feature = str_replace_all(.$feature,"_25_64", "")) %>%
+  arrange(desc(Overall)) %>%
+  head(9) %>%
+  pull(feature)
 #taking the training data and making long form for a graph
-train_final_nocat %>%  
+train_set_final %>%
   #pivot to a long version with a row per feature/value
   rename_at(vars(ends_with("25_64")), ~str_replace_all(., "_25_64", "")) %>%
   pivot_longer(cols = !"y", 
@@ -1626,23 +1650,9 @@ train_final_nocat %>%
   ggplot(aes(y, value, col=feature))  + 
   geom_point() +
   facet_wrap(. ~feature,  scales = "free_y") +
-  ggtitle("Outcome y for important features") +
+  ggtitle("Outcome y for important features for GLM") +
   xlab("y, proportion of managerial & professional") +
   ylab("feature values")
-
-# test if it will work with categorical feature the the smaller_cat
-train_glm <- train(y ~ ., method = "glm", data = train_smaller_cat)
-# glm does work...
-
-# with the full train set
-result_glm_train_set_final <- results_train_method(train_set_final, "glm")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, 
-                          tail(result_glm_train_set_final$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance
-importance <- varImp(result_glm_train_set_final$train, scale=FALSE)
-plot(importance, 20)
 
 # tidy up
 importance_glm <- importance 
@@ -1654,9 +1664,10 @@ rm(result_glm_train_final_nocat, result_glm_train_small)
 rm(result_glm_train_smaller, result_glm_train_set_final)
 
 
-#### K nearest neighbours (KNN) ####
+#### K nearest neighbours - knn ####
 # with the smaller training set
-result_knn_train_smaller <- results_train_method(train_smaller, "knn")
+result_knn_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "knn")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_knn_train_smaller$results, 1))
@@ -1665,14 +1676,16 @@ rmse_results %>% knitr::kable()
 importance <- varImp(result_knn_train_smaller$train, scale=FALSE)
 
 # with the full train set, less categorical
-result_knn_train_final_nocat <- results_train_method(train_final_nocat, "knn")
+result_knn_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "knn")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_knn_train_final_nocat$results, 1))
 rmse_results %>% knitr::kable()
 
 # test if it will work with categorical feature the the smaller_cat
-result_knn_train_smaller_cat <- results_train_method(train_smaller_cat, "knn")
+result_knn_train_smaller_cat <- 
+  results_train_method(train_smaller_cat, test_set_final, "knn")
 # knn does work...
 
 #making a new small training set, without the age and area
@@ -1682,7 +1695,8 @@ train_set_knn_small <- train_small %>%
 max(train_set_knn_small[1,])
 
 #check with the new knn small training set
-result_knn_train_set_knn_small <- results_train_method(train_set_knn_small, "knn")
+result_knn_train_set_knn_small <- 
+  results_train_method(train_set_knn_small, test_set_final, "knn")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_knn_train_set_knn_small$results, 1))
@@ -1695,7 +1709,8 @@ train_set_knn_final_nocat <- train_final_nocat %>%
 max(train_set_knn_final_nocat[1,])
 
 #check with the new training set
-result_knn_train_set_knn_final_nocat <- results_train_method(train_set_knn_final_nocat, "knn")
+result_knn_train_set_knn_final_nocat <- 
+  results_train_method(train_set_knn_final_nocat, test_set_final, "knn")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_knn_train_set_knn_final_nocat$results, 1))
@@ -1715,20 +1730,45 @@ identical(names(train_final_norm), names(train_final_nocat))
 summary(train_final_norm[,4:7])
 
 #check with the new normalised training set
-result_knn_train_final_norm <- results_train_method(train_final_norm, "knn")
+result_knn_train_final_norm <- 
+  results_train_method(train_final_norm, test_set_final, "knn")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_knn_train_final_norm$results, 1))
 rmse_results %>% knitr::kable()
 
+#checking the tuning for the best model
+plot(result_knn_train_set_knn_final_nocat$train)
+# this shows 9 neighbours is not the bottom of the curve
+# trying more neighbours
+load("rda/train_knn.rda")
+train_knn <- train(y ~ ., method = "knn", data = train_set_knn_final_nocat, tuneLength=7)
+# train_knnsmaller <- train(y ~ ., method = "knn", data = train_smaller, preProcess = c("center","scale"), tuneLength=7)
+# 13 neighbours is best
+plot(train_knn)
+#making the prediction
+yhat_knn <- predict(train_knn, test_set_final)
+yhat_knn <- predict(train_knnsmaller, test_set_final)
+# calculating the rmse
+rmse_knn <- rmse(test_set_final$y, yhat_knn)
+#adding to the RMSE list
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method='"knn" - train_set_knn_final_nocat, k=13',  
+                                 rmse = rmse_knn))
+rmse_results %>% tail(5) %>% knitr::kable()
+
+
 # tidy up
 save(rmse_results, file="rda/rmse_results.rda")
+save(train_knn, file="rda/train_knn.rda")
 save(train_set_knn_small, file="rda/train_set_knn_small.rda")
 save(train_set_knn_final_nocat, file="rda/train_set_knn_final_nocat.rda")
 rm(result_knn_train_final_norm, result_knn_train_set_knn_final_nocat)
 rm(result_knn_train_smaller, result_knn_train_small)
 rm(result_knn_train_set_knn_small)
 rm(result_knn_train_final_nocat, result_knn_train_smaller_cat)
+rm(train_knn, train_knnsmaller, train_set_knn_final_nocat)
+
 
 #### naive_bayes ####
 # *** an error "Error: wrong model type for regression"
@@ -1743,7 +1783,8 @@ train_nb <- train(y ~ ., method = "naive_bayes", data = train_smaller)
 if (!require('rpart')) install.packages('rpart'); library('rpart')
 
 # with the smaller training set
-result_rpart_train_smaller <- results_train_method(train_smaller, "rpart")
+result_rpart_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "rpart")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_rpart_train_smaller$results, 1))
@@ -1755,7 +1796,8 @@ plot(importance, 20)
 result_rpart_train_smaller$train$finalModel
 
 # with the small training set
-result_rpart_train_small <- results_train_method(train_small, "rpart")
+result_rpart_train_small <- 
+  results_train_method(train_small, test_set_final, "rpart")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_rpart_train_small$results, 1))
@@ -1766,7 +1808,8 @@ plot(importance, 20)
 result_rpart_train_small$train$finalModel
 
 # with the final set
-result_rpart_train_set_final <- results_train_method(train_set_final, "rpart")
+result_rpart_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "rpart")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_rpart_train_set_final$results, 1))
@@ -1787,7 +1830,8 @@ rm(result_rpart_train_set_final)
 if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
 
 # with the smaller training set
-result_svm_train_smaller <- results_train_method(train_smaller, "svmLinear")
+result_svm_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "svmLinear")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_svm_train_smaller$results, 1))
@@ -1795,14 +1839,16 @@ rmse_results %>% knitr::kable()
 # importance <- varImp(result_svm_train_smaller$train, scale=FALSE)
 
 # with the small training set
-result_svm_train_small <- results_train_method(train_small, "svmLinear")
+result_svm_train_small <- 
+  results_train_method(train_small, test_set_final, "svmLinear")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_svm_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the full train set, less categorical
-result_svm_train_final_nocat <- results_train_method(train_final_nocat, "svmLinear")
+result_svm_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "svmLinear")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_svm_train_final_nocat$results, 1))
@@ -1813,7 +1859,8 @@ train_svm <- train(y ~ ., method = "svmLinear", data = train_smaller_cat)
 # svm does work...
 
 # with the full training set
-result_svm_train_set_final <- results_train_method(train_set_final, "svmLinear")
+result_svm_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "svmLinear")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_svm_train_set_final$results, 1))
@@ -1832,7 +1879,8 @@ if (!require('gbm')) install.packages('gbm'); library('gbm')
 if (!require('plyr')) install.packages('plyr'); library('plyr')
 
 # with the smaller training set
-result_gbm_train_smaller <- results_train_method(train_smaller, "gbm")
+result_gbm_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "gbm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_gbm_train_smaller$results, 1))
@@ -1840,27 +1888,34 @@ rmse_results %>% knitr::kable()
 #checking the variable importance, doesn't work
 # importance <- varImp(result_gbm_train_smaller$train, scale=FALSE)
 result_gbm_train_smaller$train$finalModel
+plot(result_gbm_train_smaller$train)
 
 # with the small train set
-result_gbm_train_small <- results_train_method(train_small, "gbm")
+result_gbm_train_small <- 
+  results_train_method(train_small, test_set_final, "gbm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_gbm_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the full train set, less categorical
-result_gbm_train_final_nocat <- results_train_method(train_final_nocat, "gbm")
+result_gbm_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "gbm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_gbm_train_final_nocat$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the full train set
-result_gbm_train_set_final <- results_train_method(train_set_final, "gbm")
+result_gbm_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "gbm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_gbm_train_set_final$results, 1))
 rmse_results %>% knitr::kable()
+
+#checking the tuning, seems ok
+plot(result_gbm_train_set_final$train)
 
 #tidy
 save(result_gbm_train_set_final, file="rda/result_gbm_train_set_final.rda")
@@ -1913,7 +1968,8 @@ if (!require('mgcv')) install.packages('mgcv'); library('mgcv')
 if (!require('nlme')) install.packages('nlme'); library('nlme')
 
 # with the smaller training set
-result_gam_train_smaller <- results_train_method(train_smaller, "gam")
+result_gam_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "gam")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_gam_train_smaller$results, 1))
@@ -1924,7 +1980,8 @@ plot(importance, 20)
 result_gam_train_smaller$train$finalModel
 
 # with the small training set
-result_gam_train_small <- results_train_method(train_small, "gam")
+result_gam_train_small <- 
+  results_train_method(train_small, test_set_final, "gam")
 # did not complete, took too long
 
 #tidy
@@ -1937,7 +1994,8 @@ rm(result_gam_train_smaller)
 if (!require('elasticnet')) install.packages('elasticnet'); library('elasticnet')
 
 # with the smaller training set
-result_lasso_train_smaller <- results_train_method(train_smaller, "lasso")
+result_lasso_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "lasso")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_lasso_train_smaller$results, 1))
@@ -1947,7 +2005,8 @@ rmse_results %>% knitr::kable()
 result_lasso_train_smaller$train$finalModel
 
 # with the small training set
-result_lasso_train_small <- results_train_method(train_small, "lasso")
+result_lasso_train_small <- 
+  results_train_method(train_small, test_set_final, "lasso")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_lasso_train_small$results, 1))
@@ -1955,7 +2014,8 @@ rmse_results %>% knitr::kable()
 
 # with the full train set, less categorical
 # with the small training set
-result_lasso_train_final_nocat <- results_train_method(train_final_nocat, "lasso")
+result_lasso_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "lasso")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_lasso_train_final_nocat$results, 1))
@@ -1966,7 +2026,8 @@ train_lasso <- train(y ~ ., method = "lasso", data = train_smaller_cat)
 #yes it does
 
 #compare glm and lasso predictions
-result_lasso_train_set_final <- results_train_method(train_set_final, "lasso")
+result_lasso_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "lasso")
 rmse_results <- bind_rows(rmse_results,
                           tail(result_lasso_train_set_final$results, 1))
 result_lasso_train_set_final$results$rmse
@@ -2010,7 +2071,8 @@ save(rmse_results, file="rda/rmse_results.rda")
 if (!require('pls')) install.packages('pls'); library('pls')
 
 # with the smaller training set
-result_pcr_train_smaller <- results_train_method(train_smaller, "pcr")
+result_pcr_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "pcr")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_pcr_train_smaller$results, 1))
@@ -2018,20 +2080,24 @@ rmse_results %>% knitr::kable()
 #checking the variable importance, doesn't work
 # importance <- varImp(result_pcr_train_smaller$train, scale=FALSE)
 result_pcr_train_smaller$train$modelInfo
+plot(result_pcr_train_smaller$train)
 
 # with the small training set
-result_pcr_train_small <- results_train_method(train_small, "pcr")
+result_pcr_train_small <- 
+  results_train_method(train_small, test_set_final, "pcr")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_pcr_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
 #test the categorical
-result_pcr_train_smaller_cat <- results_train_method(train_smaller_cat, "pcr")
+result_pcr_train_smaller_cat <- 
+  results_train_method(train_smaller_cat, test_set_final, "pcr")
 # it works
 
 # with the full train set
-result_pcr_train_set_final <- results_train_method(train_set_final, "pcr")
+result_pcr_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "pcr")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_pcr_train_set_final$results, 1))
@@ -2050,7 +2116,8 @@ save(rmse_results, file="rda/rmse_results.rda")
 if (!require('arm')) install.packages('arm'); library('arm')
 
 # with the smaller training set
-result_bayesglm_train_smaller <- results_train_method(train_smaller, "bayesglm")
+result_bayesglm_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "bayesglm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_bayesglm_train_smaller$results, 1))
@@ -2060,7 +2127,8 @@ rmse_results %>% knitr::kable()
 result_bayesglm_train_smaller$train$finalModel
 
 # with the small training set
-result_bayesglm_train_small <- results_train_method(train_small, "bayesglm")
+result_bayesglm_train_small <- 
+  results_train_method(train_small, test_set_final, "bayesglm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_bayesglm_train_small$results, 1))
@@ -2071,7 +2139,8 @@ result_bayesglm_train_small$train$finalModel
 # seems similar to the GLM
 # checking...
 # compare glm and bayesglm predictions
-result_bayesglm_train_set_final <- results_train_method(train_set_final, "bayesglm")
+result_bayesglm_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "bayesglm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_bayesglm_train_set_final$results, 1))
@@ -2102,7 +2171,8 @@ save(rmse_results, file="rda/rmse_results.rda")
 if (!require('gam')) install.packages('gam'); library('gam')
 
 # with the smaller training set
-result_gamloess_train_smaller <- results_train_method(train_smaller, "gamLoess")
+result_gamloess_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "gamLoess")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_gamloess_train_smaller$results, 1))
@@ -2110,9 +2180,11 @@ rmse_results %>% knitr::kable()
 #checking the variable importance
 importance <- varImp(result_gamloess_train_smaller$train, scale=FALSE)
 plot(importance, 20)
+result_gamloess_train_smaller$train
 
 # with the small training set
-result_gamloess_train_small <- results_train_method(train_small, "gamLoess")
+result_gamloess_train_small <- 
+  results_train_method(train_small, test_set_final, "gamLoess")
 # did not complete
 
 #tidy
@@ -2126,7 +2198,8 @@ if (!require('ranger')) install.packages('ranger'); library('ranger')
 if (!require('e1071')) install.packages('e1071'); library('e1071')?
   
 # with the smaller training set
-result_ranger_train_smaller <- results_train_method(train_smaller, "ranger")
+result_ranger_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "ranger")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_ranger_train_smaller$results, 1))
@@ -2136,20 +2209,26 @@ importance <- varImp(result_ranger_train_smaller$train, scale=FALSE)
 result_ranger_train_smaller$train$finalModel
 
 # with the small training set
-result_ranger_train_small <- results_train_method(train_small, "ranger")
+result_ranger_train_small <- 
+  results_train_method(train_small, test_set_final, "ranger")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_ranger_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the full training set
-result_ranger_train_set_final <- results_train_method(train_set_final, "ranger")
+result_ranger_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "ranger")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_ranger_train_set_final$results, 1))
 rmse_results %>% knitr::kable()
 
+#checking the tuning, seems ok
+plot(result_ranger_train_set_final$train)
+
 #tidy
+load("rda/result_ranger_train_set_final.rda")
 save(result_ranger_train_set_final, file="rda/result_ranger_train_set_final.rda")
 rm(result_ranger_train_set_final, result_ranger_train_small) 
 rm(result_ranger_train_smaller)
@@ -2162,7 +2241,8 @@ if (!require('mboost')) install.packages('mboost'); library('mboost')
 if (!require('plyr')) install.packages('plyr'); library('plyr')
 
 # with the smaller training set
-result_glmboost_train_smaller <- results_train_method(train_smaller, "glmboost")
+result_glmboost_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "glmboost")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_glmboost_train_smaller$results, 1))
@@ -2173,18 +2253,21 @@ plot(importance, 20)
 result_glmboost_train_smaller$train$finalModel
 
 # with the small training set
-result_glmboost_train_small <- results_train_method(train_small, "glmboost")
+result_glmboost_train_small <- 
+  results_train_method(train_small, test_set_final, "glmboost")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_glmboost_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
 #test the categorical
-result_glmboost_train_smaller_cat <- results_train_method(train_smaller_cat, "glmboost")
+result_glmboost_train_smaller_cat <- 
+  results_train_method(train_smaller_cat, test_set_final, "glmboost")
 # it works
 
 # with the full training set, no categorical features
-result_glmboost_train_final_nocat <- results_train_method(train_final_nocat, "glmboost")
+result_glmboost_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "glmboost")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_glmboost_train_final_nocat$results, 1))
@@ -2194,7 +2277,8 @@ importance <- varImp(result_glmboost_train_final_nocat$train, scale=FALSE)
 plot(importance, 20)
 
 # with the full training set
-result_glmboost_train_set_final <- results_train_method(train_set_final, "glmboost")
+result_glmboost_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "glmboost")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_glmboost_train_set_final$results, 1))
@@ -2203,12 +2287,15 @@ rmse_results %>% knitr::kable()
 importance <- varImp(result_glmboost_train_set_final$train, scale=FALSE)
 plot(importance, 20)
 
+#checking tuning
+plot(result_glmboost_train_set_final$train)
+
 #tidy
 importance_glmboost <- importance 
 save(result_glmboost_train_set_final, file="rda/result_glmboost_train_set_final.rda")
 save(importance_glmboost, file="rda/importance_glmboost.rda")
 save(rmse_results, file="rda/rmse_results.rda")
-load("rda/result_glmboost_train_set_final.rda")
+# load("rda/result_glmboost_train_set_final.rda")
 rm(importance)
 rm(result_glmboost_train_smaller, result_glmboost_train_small) 
 rm(result_glmboost_train_smaller_cat, result_glmboost_train_final_nocat) 
@@ -2220,7 +2307,8 @@ rm(result_glmboost_train_set_final)
 if (!require('nnet')) install.packages('nnet'); library('nnet')
 
 # with the smaller training set
-result_avnnet_train_smaller <- results_train_method(train_smaller, "avNNet")
+result_avnnet_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "avNNet")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_avnnet_train_smaller$results, 1))
@@ -2231,29 +2319,37 @@ importance <- varImp(result_avnnet_train_smaller$train, scale=FALSE)
 result_avnnet_train_smaller$train$finalModel
 
 # with the small training set
-result_avnnet_train_small <- results_train_method(train_small, "avNNet")
+result_avnnet_train_small <- 
+  results_train_method(train_small, test_set_final, "avNNet")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_avnnet_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the full train set, less categorical
-result_avnnet_train_final_nocat <- results_train_method(train_final_nocat, "avNNet")
+result_avnnet_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "avNNet")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_avnnet_train_final_nocat$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the full train set
-result_avnnet_train_set_final <- results_train_method(train_set_final, "avNNet")
+result_avnnet_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "avNNet")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_avnnet_train_set_final$results, 1))
 rmse_results %>% knitr::kable()
 
+# checking model tuning
+plot(result_avnnet_train_set_final$train)
+result_avnnet_train_set_final$train
+
 #tidy 
 save(rmse_results, file="rda/rmse_results.rda")
 save(result_avnnet_train_set_final, file="rda/result_avnnet_train_set_final.rda")
+load("rda/result_avnnet_train_set_final.rda")
 rm(result_avnnet_train_small, result_avnnet_train_smaller) 
 rm(result_avnnet_train_final_nocat, result_avnnet_train_set_final)
 
@@ -2263,7 +2359,8 @@ rm(result_avnnet_train_final_nocat, result_avnnet_train_set_final)
 if (!require('e1071')) install.packages('e1071'); library('e1071')
 
 # with the smaller training set
-result_svm2_train_smaller <- results_train_method(train_smaller, "svmLinear2")
+result_svm2_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "svmLinear2")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_svm2_train_smaller$results, 1))
@@ -2272,14 +2369,16 @@ rmse_results %>% knitr::kable()
 importance <- varImp(result_svm2_train_smaller$train, scale=FALSE)
 
 # with the small training set
-result_svm2_train_small <- results_train_method(train_small, "svmLinear2")
+result_svm2_train_small <- 
+  results_train_method(train_small, test_set_final, "svmLinear2")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_svm2_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the full train set, less categorical
-result_svm2_train_final_nocat <- results_train_method(train_final_nocat, "svmLinear2")
+result_svm2_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "svmLinear2")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_svm2_train_final_nocat$results, 1))
@@ -2288,7 +2387,8 @@ rmse_results %>% knitr::kable()
 # seems similar to the svmlinear
 # checking...
 # compare svmlinear and svmlinear2 predictions
-result_svm2_train_set_final <- results_train_method(train_set_final, "svmLinear2")
+result_svm2_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "svmLinear2")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_svm2_train_set_final$results, 1))
@@ -2326,7 +2426,8 @@ rm(y_hat_svm, y_hat_svm2)
 if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
 
 # with the smaller training set
-result_svmradial_train_smaller <- results_train_method(train_smaller, "svmRadial")
+result_svmradial_train_smaller <- 
+  results_train_method(train_smaller, test_set_final, "svmRadial")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_svmradial_train_smaller$results, 1))
@@ -2335,25 +2436,32 @@ rmse_results %>% knitr::kable()
 importance <- varImp(result_svmradial_train_smaller$train, scale=FALSE)
 
 # with the small training set
-result_svmradial_train_small <- results_train_method(train_small, "svmRadial")
+result_svmradial_train_small <- 
+  results_train_method(train_small, test_set_final, "svmRadial")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_svmradial_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the full train set, less categorical
-result_svmradial_train_final_nocat <- results_train_method(train_final_nocat, "svmRadial")
+result_svmradial_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "svmRadial")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_svmradial_train_final_nocat$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the full train set
-result_svmradial_train_set_final <- results_train_method(train_set_final, "svmRadial")
+result_svmradial_train_set_final <- 
+  results_train_method(train_set_final, test_set_final, "svmRadial")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_svmradial_train_set_final$results, 1))
 rmse_results %>% knitr::kable()
+
+#checking the tuning
+plot(result_svmradial_train_set_final$train)
+result_svmradial_train_set_final$train
 
 #tidy 
 save(result_svmradial_train_set_final, file="rda/result_svmradial_train_set_final.rda")
@@ -2365,14 +2473,18 @@ rm(result_svmradial_train_set_final)
 ##### ensemble   #####
 # Identify the leading models, the top 5
 rmse_results %>%
-  arrange(rmse) %>% head(15) %>% knitr::kable()
+  arrange(rmse) %>% 
+  # filter(str_detect(method, "train_set_final") ) %>%
+  filter(str_detect(method, "glm") ) %>%
+  # head(10) %>% 
+  knitr::kable()
 # create an ensemble y hats
 load("rda/result_glm_train_set_final.rda")
 load("rda/result_svm_train_set_final.rda")
 load("rda/result_svmradial_train_set_final.rda")
 load("rda/result_gbm_train_set_final.rda")
-load("rda/result_avnnet_train_set_final.rda")
-result_gbm_train_set_final$y_hat
+load("rda/result_ranger_train_set_final.rda")
+
 # create table of y_hat
 y_hat_ens_table <- 
   data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
@@ -2380,16 +2492,25 @@ y_hat_ens_table <-
   cbind(data.frame(result_gbm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
-  cbind(data.frame(result_avnnet_train_set_final$y_hat)) %>%
+  cbind(data.frame(result_ranger_train_set_final$y_hat)) %>%
   select(-number) %>%
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble glm, gbm, svm, svmRadial, avvnet",  
+                          tibble(method="Ensemble glm, gbm, svm, svmRadial, ranger",  
                                  rmse = rmse_ens))
 rmse_results %>% tail(5) %>% knitr::kable()
+# rmse_results %>%
+#   arrange(rmse) %>% 
+#   head(10) %>% knitr::kable()
+#tidy up
+save(y_hat_ens_table, file="rda/y_hat_ens_table.rda")
+save(rmse_results, file="rda/rmse_results.rda")
+rm(y_hat_ens_table)
+rm(result_gbm_train_set_final, result_ranger_train_set_final)
+rm(result_avnnet_train_set_final)
 
 #### ensemble 2 ####
 #a smaller ensemble of the three best models
@@ -2414,8 +2535,8 @@ save(rmse_results, file="rda/rmse_results.rda")
 rm(y_hat_ens_table2, rmse_ens, y_hat_ens_table)
 rm(result_avnnet_train_set_final, result_gbm_train_set_final)
 
-#### feature prioritisation ####
 
+#### feature prioritisation ####
 # other promising models, looks like GAM, GAMloess and KNN could be interesting
 rmse_results %>%
   filter(str_detect(method, "smaller") ) %>%
@@ -2493,35 +2614,35 @@ data.frame(cor(train_set_final)) %>%
 
 # looking at the rmse with numbers of features
 #creating a function to choose the top n features, based on overall score
-topfeature_overall <- function(topn){
+topfeature_overall <- function(topn, traindata){
   feature_n <- feature_rank %>% 
     select(feature, mean_rank, mean_overall) %>%
     arrange(desc(mean_overall)) %>% head(topn) %>%
     pull(feature)
-  train_topn <- train_set_final %>%
+  train_topn <- traindata %>%
     select(y, all_of(feature_n))
   return(train_topn)
 }
 #creating a function to choose the top n features, based on rank
-topfeature_rank <- function(topn){
+topfeature_rank <- function(topn, traindata){
   feature_n <- feature_rank %>% 
     select(feature, mean_rank, mean_overall) %>%
     arrange(mean_rank) %>% head(topn) %>%
     pull(feature)
-  train_topn <- train_set_final %>%
+  train_topn <- traindata %>%
     select(y, all_of(feature_n))
   return(train_topn)
 }
 
 # load("rda/feature_rank.rda")
 #create new training sets
-train_top10 <- topfeature_overall(10)
+train_top10 <- topfeature_overall(10, train_set_final)
 # names(train_top10)
-train_top10_rank <- topfeature_rank(10)
+train_top10_rank <- topfeature_rank(10, train_set_final)
 # names(train_top10_rank)
-train_top15 <- topfeature_overall(15)
-train_top20 <- topfeature_overall(20)
-train_top30 <- topfeature_overall(30)
+train_top15 <- topfeature_overall(15, train_set_final)
+train_top20 <- topfeature_overall(20, train_set_final)
+train_top30 <- topfeature_overall(30, train_set_final)
 
 # tidy up
 save(feature_rank, file="rda/feature_rank.rda")
@@ -2532,27 +2653,31 @@ rm(importance, importance_gbm, importance_glm, importance_glmboost)
 
 # running on the GLM model
 # with the top15 training set
-result_glm_train_top15 <- results_train_method(train_top15, "glm")
+result_glm_train_top15 <- 
+  results_train_method(train_top15, test_set_final, "glm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_glm_train_top15$results, 1))
 rmse_results %>% knitr::kable()
 # with the top20 training set
-result_glm_train_top20 <- results_train_method(train_top20, "glm")
+result_glm_train_top20 <- 
+  results_train_method(train_top20, test_set_final, "glm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_glm_train_top20$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the top10 training set
-result_glm_train_top10 <- results_train_method(train_top10, "glm")
+result_glm_train_top10 <- 
+  results_train_method(train_top10, test_set_final, "glm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_glm_train_top10$results, 1))
 rmse_results %>% knitr::kable()
 
 # with the top10 training set on rank
-result_glm_train_top10_rank <- results_train_method(train_top10_rank, "glm")
+result_glm_train_top10_rank <- 
+  results_train_method(train_top10_rank, test_set_final, "glm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_glm_train_top10_rank$results, 1))
@@ -2567,9 +2692,10 @@ load("rda/feature_rank.rda")
 #apply to all of the top 10 to top 50 features
 glm_top10_top50_tmp <- sapply(10:50, function(n){
   print(paste("training with", n, "features"))
-  train_topn <- topfeature_overall(n)
+  train_topn <- topfeature_overall(n, train_set_final)
   print("running results function")
-  result_glm_train_topn <- results_train_method(train_topn, "glm")
+  result_glm_train_topn <- 
+    results_train_method(train_topn, test_set_final, "glm")
   result_glm_train_topn$results[,2]
 })
 
@@ -2589,9 +2715,10 @@ data.frame(glm_top10_top50) %>%
 #apply to the top 20 to top 40 features
 svmradial_top20_top40_tmp <- sapply(seq(20, 40, 2), function(n){
   print(paste("training with", n, "features"))
-  train_topn <- topfeature_overall(n)
+  train_topn <- topfeature_overall(n, train_set_final)
   print("running results function")
-  result_svmradial_train_topn <- results_train_method(train_topn, "svmRadial")
+  result_svmradial_train_topn <- 
+    results_train_method(train_topn, test_set_final, "svmRadial")
   result_svmradial_train_topn$results[,2]
 })
 #extract the rmse values and put in a table
@@ -2614,9 +2741,10 @@ data.frame(svmradial_top20_top40) %>%
 #apply to the top 20 to top 40 features
 svm_top20_top40_tmp <- sapply(seq(20, 40, 2), function(n){
   print(paste("training with", n, "features"))
-  train_topn <- topfeature_overall(n)
+  train_topn <- topfeature_overall(n, train_set_final)
   print("running results function")
-  result_svm_train_topn <- results_train_method(train_topn, "svmLinear")
+  result_svm_train_topn <- 
+    results_train_method(train_topn, test_set_final, "svmLinear")
   result_svm_train_topn$results[,2]
 })
 #extract the rmse values and put in a table
@@ -2647,9 +2775,10 @@ load("rda/svmradial_top20_top40.rda")
 #### gam and gam loess again ####
 
 # running on GAM with 25 features
-train_top25 <- topfeature_overall(25)
+train_top25 <- topfeature_overall(25, train_set_final)
 # with the train_top25 training set
-result_gam_train_top25 <- results_train_method(train_top25, "gam")
+result_gam_train_top25 <- 
+  results_train_method(train_top25, test_set_final, "gam")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, tail(result_gam_train_top25$results, 1))
 rmse_results %>% knitr::kable()
@@ -2661,19 +2790,22 @@ save(result_gam_train_top25, file="rda/result_gam_train_top25.rda")
 rm(result_gam_train_top25)
 
 # running on GAM with 28 features
-train_top28 <- topfeature_overall(28)
+train_top28 <- topfeature_overall(28, train_set_final)
 # with the train_top28 training set
-result_gam_train_top28 <- results_train_method(train_top28, "gam")
+result_gam_train_top28 <- 
+  results_train_method(train_top28, test_set_final, "gam")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, tail(result_gam_train_top28$results, 1))
 rmse_results %>% knitr::kable()
 # tidy
 save(result_gam_train_top28, file="rda/result_gam_train_top28.rda")
+load("rda/result_gam_train_top28.rda")
 rm(result_gam_train_top28)
 
 # running on GAMloess with 28 features
 # with the train_top28 training set
-result_gamloess_train_top28 <- results_train_method(train_top28, "gamLoess")
+result_gamloess_train_top28 <- 
+  results_train_method(train_top28, test_set_final, "gamLoess")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, tail(result_gamloess_train_top28$results, 1))
 rmse_results %>% knitr::kable()
@@ -2705,7 +2837,8 @@ data.frame(y_hat_gam, y_hat_gamLoess) %>%
 train_top28_knn <- train_top28 %>%
   select(-age_median, -area_code)
 # with the train_top28 training set
-result_knn_train_top28_knn <- results_train_method(train_top28_knn, "knn")
+result_knn_train_top28_knn <- 
+  results_train_method(train_top28_knn, test_set_final, "knn")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, tail(result_knn_train_top28_knn$results, 1))
 rmse_results %>% knitr::kable()
@@ -2776,8 +2909,7 @@ rmse_results <- bind_rows(rmse_results,
                           tibble(method="Ensemble5 svmRadial, gam",  
                                  rmse = rmse_ens))
 rmse_results %>%
-  arrange(rmse) %>% head(10) %>% knitr::kable()
-rmse_results %>%
+  # arrange(rmse) %>% head(10) %>% knitr::kable()
   arrange(rmse) %>% head(20) %>% knitr::kable()
 
 # tidy up
@@ -2865,18 +2997,94 @@ sum(is.na(main_clean))
 # tidy up
 save(main_clean, file="rda/main_clean.rda")
 save(validation_clean, file="rda/validation_clean.rda")
-rm(geo_mapping, tmp, tmp1)
+rm(geo_lookup, tmp, tmp1)
 # create baseline
 mu_hat <- mean(main_clean$y)
 rmse_ave <- rmse(validation_clean$y, mu_hat)
-rmse_results <- tibble(method = "Mean on validation", rmse = rmse_ave)
-rmse_results %>% knitr::kable()
+rmse_results_validation <- tibble(method = "Mean on main & validation", rmse = rmse_ave)
+rmse_results_validation %>% knitr::kable()
+
+#tidy
+load("rda/rmse_results.rda")
+save(rmse_results_validation, file="rda/rmse_results_validation.rda")
+
+# run on glm radial
+result_glm_main <- 
+  results_train_method(main_clean, validation_clean, "glm")
+# extract the rmse from the results
+rmse_results_validation <- bind_rows(rmse_results_validation, 
+                                     tail(result_glm_main$results, 1))
+rmse_results_validation %>% knitr::kable()
+#tidy
+save(rmse_results_validation, file="rda/rmse_results_validation.rda")
+
+# run on svm radial
+# uses package kernlab
+if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
+# with the full train set
+result_svmradial_main <- 
+  results_train_method(main_clean, validation_clean, "svmRadial")
+# extract the rmse from the results
+rmse_results_validation <- bind_rows(rmse_results_validation, 
+                                     tail(result_svmradial_main$results, 1))
+rmse_results_validation %>% knitr::kable()
+#tidy
+save(rmse_results_validation, file="rda/rmse_results_validation.rda")
+save(result_svmradial_main, file="rda/result_svmradial_main.rda")
+
+# run on gam
+# load top 28 features with the GLM, GBM and GLM boost models on the train/test data
+load("rda/feature_rank.rda")
+# put together the prioritised main data set subset
+main_top28 <- topfeature_overall(28, main_clean)
+# train the model with the train_top28 training set
+result_gam_main_top28 <- 
+  results_train_method(main_top28, validation_clean, "gam")
+# extract the rmse from the results
+rmse_results_validation <- bind_rows(rmse_results_validation,
+                                     tail(result_gam_main_top28$results, 1))
+rmse_results_validation %>% knitr::kable()
+# tidy
+save(result_gam_main_top28, file="rda/result_gam_main_top28.rda")
+save(rmse_results_validation, file="rda/rmse_results_validation.rda")
+
+# ensemble of 2
+y_hat_ens_main <- 
+  data.frame(svmradial_y_hat = result_svmradial_main$y_hat, 
+             gam_y_hat = result_gam_main_top28$y_hat) %>%
+  #calculate average of the y_hats
+  mutate(y_hat_ave = rowMeans(.))
+#test against the actual values
+rmse_ens <- rmse(validation$y, y_hat_ens_main$y_hat_ave)
+rmse_results_validation <- bind_rows(rmse_results_validation,
+                          tibble(method="Ensemble svmRadial, gam28",  
+                                 rmse = rmse_ens))
+rmse_results_validation %>% knitr::kable()
+
+# comparing the svmradial and gam models
+y_hat_ens_main %>%
+  cbind(y = validation$y) %>%
+  select(-y_hat_ave) %>%
+  pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
+  ggplot(aes(x=y_hat, y=y, col=model)) +
+  geom_point()  +
+  geom_abline(slope = 1, intercept = 0, col="black") +
+  ggtitle("Comparing gam and svm radial predictions vs the outcome y") +
+  xlab("model predictions") +
+  ylab("actual values, y") 
 
 
-
-
+# tidy up
+save(rmse_results_validation, file="rda/rmse_results_validation.rda")
+save(y_hat_ens_main, file="rda/y_hat_ens_main.rda")
+load("rda/y_hat_ens_main.rda")
+rm(rmse_ens, y_hat_ens_main)
+rm(result_gam_main_top28)
+rm(result_svmradial_main)
+rm(result_glm_main)
 
 #### running on the SOA  #####
+
 
 
 
