@@ -85,10 +85,10 @@ rm(tmp, filled_form, nomis_form, nomis_session, nomis_session2, filename, nomis_
 ############ Import and clean the prediction #####################
 options(digits = 3)
 # create function to read file
-ingest <- function(censustable){
+ingest <- function(censustable, geography){
   print(paste("ingesting", censustable))
   # generate file name for loading
-  filename <- paste(censustable, geographytype, sep = "_") %>%
+  filename <- paste(censustable, geography, sep = "_") %>%
     paste0(., ".csv") %>%
     paste0("data/", .)
   print(filename)
@@ -101,7 +101,7 @@ ingest <- function(censustable){
 #load in occupation data
 # https://www.nomisweb.co.uk/census/2011/ks608ew
 # import the new table with occupation data
-data <- ingest("ks608ew")
+data <- ingest("ks608ew", geographytype)
 names(data)
 # create mgr-prf ratios
 occupation <- data %>%
@@ -141,7 +141,7 @@ rm(occupation, occup_tmp)
 ############ Import and clean the data #####################
 #step wise adding more tables from the census to put together potential predictors
 #load in residents and sex data
-data <- ingest("ks101ew")
+data <- ingest("ks101ew", geographytype)
 names(data)
 colnames(data) <- c("date", "geo_name", "geo_code", "geo_type", "all_residents", "males", "females")
 sex <- data %>% 
@@ -158,7 +158,7 @@ save(sex, file='rda/sex.rda')
 # load in age data
 # https://www.nomisweb.co.uk/census/2011/ks102ew
 # import the new table with age data
-data <- ingest("ks102ew")
+data <- ingest("ks102ew", geographytype)
 names(data)
 #look at all of the ages, to find the right ones to work on
 age <- data %>%
@@ -205,7 +205,7 @@ names(data_set)
 # trying to find the source of the Occupation total of people
 # checking economic activity
 nomis_census_csv("ks601ew", geographytype)
-data <- ingest("ks601ew")
+data <- ingest("ks601ew", geographytype)
 names(data)
 economic <- data %>%
   rename_at(vars(contains("Sex")), ~str_replace_all(., "; measures: Value", "")) %>%
@@ -227,7 +227,7 @@ rm(economic, occupation)
 # https://www.nomisweb.co.uk/census/2011/lc2101ew
 # updating with age and ethnicity
 nomis_census_csv("lc2101ew", geographytype)
-data <- ingest("lc2101ew")
+data <- ingest("lc2101ew", geographytype)
 names(data)
 # keep only data for all sexes, between 24 and 64, and tidy the names
 ethnicity_raw <- data %>%
@@ -376,7 +376,7 @@ rm(ethnicity_aggregated, ethnicity_ordered, ethnicity_raw, ethnicity)
 # next to load in the sex/gender data, for ages 25 to 64 
 # https://www.nomisweb.co.uk/census/2011/lc2101ew
 # using the ethnicity data, which includes gender
-data <- ingest("lc2101ew")
+data <- ingest("lc2101ew", geographytype)
 #creating the raw file
 sex_25_64 <- data %>%
   #filtering all ethnicities
@@ -428,7 +428,7 @@ rm(sex, sex_25_64, sex_orig)
 # https://www.nomisweb.co.uk/census/2011/lc5102ew
 # import the new table with qualifications
 nomis_census_csv("lc5102ew", geographytype)
-data <- ingest("lc5102ew")
+data <- ingest("lc5102ew", geographytype)
 names(data)
 # manipulate to be the 25 to 64 only
 qualifications_raw <- data %>%
@@ -507,7 +507,7 @@ rm(tmp, tmp2)
 # https://www.nomisweb.co.uk/census/2011/lc1101ew
 # import the new table with marital status
 nomis_census_csv("lc1101ew", geographytype)
-data <- ingest("lc1101ew")
+data <- ingest("lc1101ew", geographytype)
 names(data)
 # manipulate to be the 25 to 64 only
 marital_raw <- data %>%
@@ -580,7 +580,7 @@ rm(marital, marital_raw, marital_orig)
 # https://www.nomisweb.co.uk/census/2011/lc2107ew
 # import the new table with religion
 nomis_census_csv("lc2107ew", geographytype)
-data <- ingest("lc2107ew")
+data <- ingest("lc2107ew", geographytype)
 names(data)
 # manipulate to be the 25 to 64 only
 religion_raw <- data %>%
@@ -667,7 +667,7 @@ rm(religion, religion_raw, religion_ordered, religion_orig)
 # https://www.nomisweb.co.uk/census/2011/lc1109ew
 # import the new table with household
 nomis_census_csv("lc1109ew", geographytype)
-data <- ingest("lc1109ew")
+data <- ingest("lc1109ew", geographytype)
 names(data)
 # manipulate to be the 25 and over only
 household_raw <- data %>%
@@ -760,7 +760,7 @@ rm(household, household_raw, household_ordered, household.org, houseshold_predic
 # https://www.nomisweb.co.uk/census/2011/lc6110ew
 # import the new table with Industry
 nomis_census_csv("lc6110ew", geographytype)
-data <- ingest("lc6110ew")
+data <- ingest("lc6110ew", geographytype)
 names(data)
 industry_raw <- data %>%
   # retain only the specific age groups
@@ -828,7 +828,7 @@ rm(industry, industry_raw, indust_orig)
 # https://www.nomisweb.co.uk/census/2011/lc2103ew
 # import the new table with country of birth
 nomis_census_csv("lc2103ew", geographytype)
-data <- ingest("lc2103ew")
+data <- ingest("lc2103ew", geographytype)
 names(data)
 # manipulate to be the 25 to 64 only
 country_raw <- data %>%
@@ -921,159 +921,186 @@ rm(country, country_raw, country_raw_orig, country_orig)
 
 
 ####### repeatable code ##########
-geographytype <- "TYPE480" #regions
+# geographytype <- "TYPE480" #regions
 geographytype <- "TYPE297" #super output areas - middle layer
 # nomis_census_csv(censusdata, geographytype)
+
 #creating list of census tables to take
 censusdata_list <- c("ks608ew", "ks102ew", "lc2101ew", "lc2103ew","lc6110ew", "lc1109ew", "lc2107ew", "lc1101ew", "lc5102ew")
-# apply the list to download all of the data
-tmp <- lapply(censusdata_list, function(censusdata){
-  # pause for a few random seconds to avoid annoying nomis
-  time <- sample(4:17,1)
-  print(paste("pausing", time, "seconds"))
-  Sys.sleep(time)
-  print(paste("downloading geography area", geographytype, "for table", censusdata))
-  #run the function to generate and download the file
-  nomis_census_csv(censusdata, geographytype)
-})
-rm(tmp)
 
-#load in occupation data
-# https://www.nomisweb.co.uk/census/2011/ks608ew
-# import the new table with occupation data
-data <- ingest("ks608ew")
-#running the function on the data set
-occupation_target(data)
-#adding to main data set
-load('rda/occupation.rda')
-data_set <- occupation
-save(data_set, file='rda/data_set.rda')
-rm(occupation)
+#create a function to download all the tables in the list
+download_censusdata <- function(geotype, datalist){
+  # apply the list to download all of the data
+  tmp <- lapply(datalist, function(censusdata){
+    # pause for a few random seconds to avoid annoying nomis
+    time <- sample(4:17,1)
+    print(paste("pausing", time, "seconds"))
+    Sys.sleep(time)
+    print(paste("downloading geography area", geotype, "for table", censusdata))
+    #run the function to generate and download the file
+    nomis_census_csv(censusdata, geotype)
+  })
+  rm(tmp)
+}
 
-# load in age data
-# https://www.nomisweb.co.uk/census/2011/ks102ew
-# import the new table with age data
-data <- ingest("ks102ew")
-#running the function on the data set
-age_predictors(data)
-#adding to main data set
-load('rda/age.rda')
-data_set <- data_set %>%
-  left_join(age)
-rm(age)
+# function to load in the data for a given geotype
+import_data <- function(geotype){
+  print(paste("importing", geotype))
+  #load in occupation data
+  print(paste("loading occupation data"))
+  # https://www.nomisweb.co.uk/census/2011/ks608ew
+  # import the new table with occupation data
+  data <- ingest("ks608ew", geotype)
+  #running the function on the data set
+  occupation_target(data)
+  #adding to main data set
+  load('rda/occupation.rda')
+  data_set <- occupation
+  rm(occupation)
+  
+  # load in age data
+  print(paste("loading age data"))
+  # https://www.nomisweb.co.uk/census/2011/ks102ew
+  # import the new table with age data
+  data <- ingest("ks102ew", geotype)
+  #running the function on the data set
+  age_predictors(data)
+  #adding to main data set
+  load('rda/age.rda')
+  data_set <- data_set %>%
+    left_join(age)
+  rm(age)
+  
+  # next to load in the ethnicity data
+  print(paste("loading ethnicity data"))
+  # https://www.nomisweb.co.uk/census/2011/lc2101ew
+  # updating with age and ethnicity
+  data <- ingest("lc2101ew", geotype)
+  #running the function on the data set
+  ethnicity_predictors(data)
+  #adding to main data set
+  load('rda/ethnicity.rda')
+  data_set <- data_set %>%
+    left_join(ethnicity)
+  rm(ethnicity)
+  
+  # next to load in the sex/gender data, for ages 25 to 64 
+  print(paste("loading sex data"))
+  # https://www.nomisweb.co.uk/census/2011/lc2101ew
+  # using the ethnicity data, which includes gender
+  data <- ingest("lc2101ew", geotype)
+  #running the function on the data set
+  sex_predictors(data)
+  #adding to main data set
+  load('rda/sex_25_64.rda')
+  data_set <- data_set %>%
+    left_join(sex_25_64)
+  rm(sex_25_64)
+  
+  # qualifications
+  print(paste("loading qualifications data"))
+  # https://www.nomisweb.co.uk/census/2011/lc5102ew
+  # import the new table with qualifications
+  data <- ingest("lc5102ew", geotype)
+  #running the function on the data set
+  qualifications_predictors(data)
+  #adding to main data set
+  load('rda/qualifications.rda')
+  data_set <- data_set %>%
+    left_join(qualifications)
+  rm(qualifications)
+  
+  # next marital status
+  print(paste("loading marital data"))
+  # https://www.nomisweb.co.uk/census/2011/lc1101ew
+  # import the new table with marital
+  data <- ingest("lc1101ew", geotype)
+  #running the function on the data set
+  marital_predictors(data)
+  #adding to main data set
+  load('rda/marital.rda')
+  data_set <- data_set %>%
+    left_join(marital)
+  rm(marital)
+  
+  # next religion
+  print(paste("loading religion data"))
+  # https://www.nomisweb.co.uk/census/2011/lc2107ew
+  # import the new table with religion
+  data <- ingest("lc2107ew", geotype)
+  #running the function on the data set
+  religion_predictors(data)
+  #adding to main data set
+  load('rda/religion.rda')
+  data_set <- data_set %>%
+    left_join(religion)
+  rm(religion)
+  
+  #next household composition
+  print(paste("loading household data"))
+  # https://www.nomisweb.co.uk/census/2011/lc1109ew
+  # import the new table with household
+  data <- ingest("lc1109ew", geotype)
+  #running the function on the data set
+  household_predictors(data)
+  #adding to main data set
+  load('rda/household.rda')
+  data_set <- data_set %>%
+    left_join(household)
+  rm(household)
+  
+  #next Industry
+  print(paste("loading industry data"))
+  # https://www.nomisweb.co.uk/census/2011/lc6110ew
+  # import the new table with Industry
+  data <- ingest("lc6110ew", geotype)
+  #running the function on the data set
+  industry_predictors(data)  
+  #adding to main data set
+  load('rda/industry.rda')
+  data_set <- data_set %>%
+    left_join(industry)
+  rm(industry)
+  # names(data_set)
+  
+  # next country of birth
+  print(paste("loading country data"))
+  # https://www.nomisweb.co.uk/census/2011/lc2103ew
+  # import the new table with country of birth
+  data <- ingest("lc2103ew", geotype)
+  #running the function on the country of birth data set
+  country_predictors(data)
+  #adding to main data set
+  load('rda/country.rda')
+  data_set <- data_set %>%
+    left_join(country)
+  rm(country, data)
+  
+  #save the data set
+  filename <- paste("data_set", geotype, sep = "_") %>%
+    paste0(., ".rda")
+  destfile <- paste0("rda/", filename)
+  print(paste("saving", destfile))
+  save(data_set, file=destfile)
+  #clean up
+  rm(filename, destfile)
+  return(data_set)
+}
 
-# next to load in the ethnicity data
-# https://www.nomisweb.co.uk/census/2011/lc2101ew
-# updating with age and ethnicity
-data <- ingest("lc2101ew")
-#running the function on the data set
-ethnicity_predictors(data)
-#adding to main data set
-load('rda/ethnicity.rda')
-data_set <- data_set %>%
-  left_join(ethnicity)
-rm(ethnicity)
-
-# https://www.nomisweb.co.uk/census/2011/lc2101ew
-# next to load in the sex/gender data, for ages 25 to 64 
-# using the ethnicity data, which includes gender
-data <- ingest("lc2101ew")
-#running the function on the data set
-sex_predictors(data)
-#adding to main data set
-load('rda/sex_25_64.rda')
-data_set <- data_set %>%
-  left_join(sex_25_64)
-rm(sex_25_64)
-
-# qualifications
-# https://www.nomisweb.co.uk/census/2011/lc5102ew
-# import the new table with qualifications
-data <- ingest("lc5102ew")
-#running the function on the data set
-qualifications_predictors(data)
-#adding to main data set
-load('rda/qualifications.rda')
-data_set <- data_set %>%
-  left_join(qualifications)
-rm(qualifications)
-
-# next marital status
-# https://www.nomisweb.co.uk/census/2011/lc1101ew
-# import the new table with marital
-data <- ingest("lc1101ew")
-#running the function on the data set
-marital_predictors(data)
-#adding to main data set
-load('rda/marital.rda')
-data_set <- data_set %>%
-  left_join(marital)
-rm(marital)
-
-# next religion
-# https://www.nomisweb.co.uk/census/2011/lc2107ew
-# import the new table with religion
-data <- ingest("lc2107ew")
-#running the function on the data set
-religion_predictors(data)
-#adding to main data set
-load('rda/religion.rda')
-data_set <- data_set %>%
-  left_join(religion)
-rm(religion)
-
-#next household composition
-# https://www.nomisweb.co.uk/census/2011/lc1109ew
-# import the new table with household
-data <- ingest("lc1109ew")
-#running the function on the data set
-household_predictors(data)
-#adding to main data set
-load('rda/household.rda')
-data_set <- data_set %>%
-  left_join(household)
-rm(household)
-
-#next Industry
-# https://www.nomisweb.co.uk/census/2011/lc6110ew
-# import the new table with Industry
-data <- ingest("lc6110ew")
-#running the function on the data set
-industry_predictors(data)  
-#adding to main data set
-load('rda/industry.rda')
-data_set <- data_set %>%
-  left_join(industry)
-rm(industry)
-# names(data_set)
-
-# next country of birth
-# https://www.nomisweb.co.uk/census/2011/lc2103ew
-# import the new table with country of birth
-data <- ingest("lc2103ew")
-#running the function on the country of birth data set
-country_predictors(data)
-#adding to main data set
-load('rda/country.rda')
-data_set <- data_set %>%
-  left_join(country)
-rm(country, data)
-
+# run the function to download the csv files
+download_censusdata("TYPE297", censusdata_list)
+# run the function on the MSOA imported data
+data_set <- import_data("TYPE297")
 #check function vs the main code
 # names(data_set)
 # names(data_set_maincode)
 # identical(data_set, data_set_main2)
 
-#save the data set
-filename <- paste("data_set", geographytype, sep = "_") %>%
-  paste0(., ".rda")
-destfile <- paste0("rda/", filename)
-save(data_set, file=destfile)
 #clean up
-rm(filename, destfile)
 rm(ingest, marital_predictors, country_predictors, occupation_target)
 rm(ethnicity_predictors, household_predictors, religion_predictors)
-rm(industry_predictors, sex_predictors, qualifications_predictors, age_predictors)
+rm(industry_predictors, sex_predictors)
+rm(qualifications_predictors, age_predictors)
 
 ############ Create main set, validation set #####################
 
@@ -1139,6 +1166,7 @@ main_tidy %>%
   geom_boxplot() +
   ggtitle("Boxplot of features") +
   ylab("proportion") + 
+  xlab("feature name, reordered by mean") + 
   theme(axis.text.x=element_text(angle = 90, hjust=1, vjust=0.5))
 
 #choosing the 10 features with the lowest mean
@@ -1191,17 +1219,14 @@ head(geo_mapping)
 # for the columns of interest are MSOA11CD (MSOA), OA11CD (SOA) and LAD11CD
 load("rda/geo_mapping.rda")
 geo_lookup <- geo_mapping %>%
-  #for the MSOA
-  select(MSOA11CD, LAD11CD) %>%
-  rename(local_area = LAD11CD, geo_code = MSOA11CD) %>%
-  #for the SOA
-  # select(OA11CD, LAD11CD) %>%
-  # rename(local_area = LAD11CD, geo_code = OA11CD) %>%
+  #for the MSOA and SOA
+  select(LAD11CD, OA11CD, MSOA11CD, ) %>%
+  rename(local_area = LAD11CD, geo_code_soa=OA11CD, geo_code_msoa = MSOA11CD) %>%
   unique()
 head(geo_lookup)
 
-#however, for many models to work, the feature needs to be numeric, so I need to convert the character strings to numbers
-#calculating a list of strings within the local area to be rewritten as numbers.  Rewriting as much as possible
+#however, for many models to work, the feature needs to be numeric, so I need to convert the character strings to numbers, so remove the "E"
+#calculating a list of strings within the local area to be rewritten as numbers, keeping the strings replaced as long as possible to reduce the length of the area_code
 area_update <- levels(as.factor(str_sub(geo_lookup$local_area, 1, -3)))
 #create a new column to be updated
 geo_lookup <- geo_lookup %>%
@@ -1222,6 +1247,8 @@ geo_lookup$area_code <- as.integer(geo_lookup$area_code)
 head(geo_lookup$area_code)
 length(levels(as.factor(geo_lookup$area_code)))
 head(levels(as.factor(geo_lookup$area_code)))
+#tmp
+save(geo_lookup, file='rda/geo_lookup_tmp.rda')
 
 #but this may not work for some algorithms
 # in addition creating a column per region
@@ -1252,6 +1279,7 @@ region_lookup <- region_mapping %>%
   select(local_area, region) %>%
   unique()
 levels(as.factor(region_lookup$region))
+head(region_lookup)
 # update empty fields to be "wales"
 # not using this as it matches the isles of scilly as well
 # index <- str_length(region_mapping$region) == "0"
@@ -1294,7 +1322,6 @@ geo_lookup[is.na(geo_lookup)] <- 0
 sum(is.na(geo_lookup))
 head(geo_lookup)
 #number of local areas
-print("number of local areas")
 length(levels(as.factor(geo_lookup$area_code)))
 #tidy up
 save(geo_lookup, file='rda/geo_lookup.rda')
@@ -1303,9 +1330,13 @@ save(geo_lookup, file='rda/geo_lookup.rda')
 # load("rda/main_tidy.rda")
 load("rda/geo_lookup.rda")
 #add to the data set
-main_new <- main %>%
-  left_join(geo_lookup) %>%
-  select(-local_area)
+main_new <- geo_lookup %>%
+  mutate(geo_code=geo_code_msoa) %>%
+  select(-geo_code_soa) %>% 
+  unique() %>%
+  right_join(main) %>%
+  select(-local_area, -geo_code_msoa)
+
 #number of local areas
 print("number of local areas")
 length(levels(as.factor(main_new$area_code)))
@@ -1320,7 +1351,9 @@ load("rda/region_lookup.rda")
 load("rda/geo_lookup.rda")
 # use the geo lookup and region from the region_lookup
 geo_lookup %>% 
+  mutate(geo_code=geo_code_msoa) %>%
   select(geo_code, local_area) %>%
+  unique() %>%
   left_join(region_lookup, by = "local_area") %>%
   select(geo_code, region) %>%
   #add the main data with y
@@ -1332,7 +1365,6 @@ geo_lookup %>%
   ggtitle("Distribution of the outcome, y") +
   xlab("y, proportions of people in managerial or professional occupations") +
   ylab("count of numbers of MSOA areas")
-
 
 #tidy
 save(main_tidy, file='rda/main_tidy.rda')
@@ -1363,11 +1395,28 @@ load("rda/train_set.rda")
 # * create local area features
 # * remove occupation & all_residents population numbers, geo name  & geo type
 load("rda/geo_lookup.rda")
-#currently working for MSOA
-data_cleanse <- function(data_set_name){
+#currently working for MSOA and SOA
+data_cleanse <- function(data_set_name, geosize){
   #generate geo mapping info
   load("rda/geo_lookup.rda")
-  #modify to update the data
+  print(paste("working on", geosize))
+  #choose the msoa geo_code
+  if(geosize=="msoa"){
+    print("msoa geolookup")
+    geo_lookup <- geo_lookup %>%
+      mutate(geo_code=geo_code_msoa)  %>%
+      select(-geo_code_soa, -geo_code_msoa) %>%
+      unique()
+  }
+  #choose the soa geo_code
+  if(geosize=="soa"){
+    print("soa geolookup")
+    geo_lookup <- geo_lookup %>%
+      mutate(geo_code=geo_code_soa)  %>%
+      select(-geo_code_soa, -geo_code_msoa) %>%
+      unique()
+  }
+  # modify the data with the geo info
   tmp <- data_set_name %>%
     mutate(occ_ratio = occupation_all/all_residents, .after = all_residents) %>%
     select(-occupation_all, -all_residents, -geo_type, -geo_name) %>%
@@ -1376,13 +1425,11 @@ data_cleanse <- function(data_set_name){
   #return the new object
   return(tmp)
 }
-# names(geo_lookup)
-# sum(is.na(geo_lookup))
-# head(geo_lookup)
 
 #run on the test set and train set
-test_set_final <- data_cleanse(test_set)
-train_set_final <- data_cleanse(train_set)
+test_set_final <- data_cleanse(test_set, "msoa")
+train_set_final <- data_cleanse(train_set, "msoa")
+
 #check
 names(test_set_final)
 names(train_set_final)
@@ -1768,6 +1815,7 @@ rm(result_knn_train_smaller, result_knn_train_small)
 rm(result_knn_train_set_knn_small)
 rm(result_knn_train_final_nocat, result_knn_train_smaller_cat)
 rm(train_knn, train_knnsmaller, train_set_knn_final_nocat)
+rm(rmse_knn, yhat_knn)
 
 
 #### naive_bayes ####
@@ -1874,7 +1922,7 @@ rm(result_svm_train_final_nocat, result_svm_train_set_final)
 
 
 #### Stochastic Gradient Boosting	- gbm ####
-# using the gbmm plyr, package
+# using the gbm plyr, package
 if (!require('gbm')) install.packages('gbm'); library('gbm')
 if (!require('plyr')) install.packages('plyr'); library('plyr')
 
@@ -1918,6 +1966,8 @@ rmse_results %>% knitr::kable()
 plot(result_gbm_train_set_final$train)
 
 #tidy
+importance_gbm <- 
+save("rda/importance_gbm.rda")
 save(result_gbm_train_set_final, file="rda/result_gbm_train_set_final.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(result_gbm_train_smaller, result_gbm_train_small)
@@ -2978,16 +3028,13 @@ head(largest_errors, 20)
 
 #### running on the validation / main set ####
 
-# writing the code for the overall model to run
-
-#run on the test set and train set
 # load the files
 load("rda/geo_lookup.rda")
 load("rda/main.rda")
 load("rda/validation.rda")
 #cleanse the data, add the geo info
-main_clean <- data_cleanse(main)
-validation_clean <- data_cleanse(validation)
+main_clean <- data_cleanse(main, "msoa")
+validation_clean <- data_cleanse(validation, "msoa")
 #check
 names(main_clean)
 names(validation_clean)
@@ -3073,7 +3120,6 @@ y_hat_ens_main %>%
   xlab("model predictions") +
   ylab("actual values, y") 
 
-
 # tidy up
 save(rmse_results_validation, file="rda/rmse_results_validation.rda")
 save(y_hat_ens_main, file="rda/y_hat_ens_main.rda")
@@ -3082,11 +3128,567 @@ rm(rmse_ens, y_hat_ens_main)
 rm(result_gam_main_top28)
 rm(result_svmradial_main)
 rm(result_glm_main)
+rm(train_set_final, train_smaller, test_set_final)
+rm(validation, validation_clean, main, main_clean, main_top28)
+rm(rmse_results, rmse_results_validation)
+
 
 #### running on the SOA  #####
+### downloading the SOA data
+# choosing London and Yorkshire
+# "2013265927TYPE299">output areas 2011 in London
+# "2013265923TYPE299">output areas 2011 in Yorkshire and The Humber
+#creating list of census tables to take
+censusdata_list <- c("ks608ew", "ks102ew", "lc2101ew", "lc2103ew","lc6110ew", "lc1109ew", "lc2107ew", "lc1101ew", "lc5102ew")
+
+# London
+# <option value="2013265927TYPE299">output areas 2011 in London</option>
+# apply the list to download all of the data
+download_censusdata("2013265927TYPE299", censusdata_list)
+#import the data for London
+data_set <- import_data("2013265927TYPE299")
+#clean up
+data_set_london <- data_set
+rm(filename)
+rm(geographytype)
 
 
+# Yorkshire and The Humber
+# <option value="2013265923TYPE299">output areas 2011 in Yorkshire and The Humber
+geographytype <- "2013265923TYPE299" # output areas 2011 in Yorkshire and The Humber
+# apply the list to download all of the data
+download_censusdata("2013265923TYPE299", censusdata_list)
+#import the data for Yorkshire
+data_set <- import_data("2013265923TYPE299")
+data_set_yorkshire <- data_set
+load("rda/data_set_2013265923TYPE299.rda")
 
+# tidy up
+rm(ingest, marital_predictors, country_predictors, occupation_target)
+rm(ethnicity_predictors, household_predictors, religion_predictors)
+rm(industry_predictors, sex_predictors, qualifications_predictors, age_predictors)
+
+
+#combine in to one data set
+data_set <- data_set_london %>%
+  rbind(data_set_yorkshire)
+# tidy
+save(data_set, file="rda/data_set_lon_york.rda")
+
+#### create main and validation set
+# Validation set will be 10% of the data
+set.seed(2011, sample.kind="Rounding")
+test_index <- createDataPartition(y = data_set$y, times = 1, p = 0.1, list = FALSE)
+main_soa <- data_set[-test_index,]
+validation_soa <- data_set[test_index,]
+### tidy, take backup:
+save(main_soa, file='rda/main_soa.rda')
+save(validation_soa, file='rda/validation_soa.rda')
+rm(validation_soa, data_set, test_index)
+
+#### create test and train set
+load("rda/main_soa.rda")
+# load("rda/main_tidy.rda")
+# test set will be 10% of the data
+set.seed(2001, sample.kind="Rounding")
+test_index <- createDataPartition(y = main_soa$y, times = 1, p = 0.1, list = FALSE)
+train_soa <- main_soa[-test_index,]
+test_soa <- main_soa[test_index,]
+#check
+names(train_soa)
+sum(is.na(train_soa))
+### tidy, take backup:
+save(train_soa, file='rda/train_soa.rda')
+save(test_soa, file='rda/test_soa.rda')
+rm(main_soa, main_tidy_soa, main_new_soa, test_index)
+load("rda/test_soa.rda")
+load("rda/train_soa.rda")
+
+#data cleanse on the test set and train set
+load("rda/geo_lookup.rda")
+test_soa_final <- data_cleanse(test_soa, "soa")
+train_soa_final <- data_cleanse(train_soa, "soa")
+
+#check
+names(test_soa_final)
+names(test_soa)
+head(test_soa_final$area_code)
+head(test_soa$geo_code)
+#check the number of local areas is correct
+# means 54 sub regions in London and Yorkshire
+length(levels(as.factor(test_soa_final$area_code)))
+length(levels(as.factor(train_soa_final$area_code)))
+names(train_soa_final)
+# check, the sum of London and Yorkshire is all of the locations, 3811
+sum(test_soa_final$london) + sum(test_soa_final$yorkshire_humber)
+# no NA
+sum(is.na(train_soa_final))
+sum(is.na(test_soa_final))
+# tidy up
+save(test_soa_final, file="rda/test_soa_final.rda")
+save(train_soa_final, file="rda/train_soa_final.rda")
+rm(test_soa, train_soa, geo_mapping, geo_lookup, main_soa)
+
+#### baseline rmse and rmse function
+# load the test and train data
+load("rda/test_soa_final.rda")
+load("rda/train_soa_final.rda")
+options(digits = 6)
+# baseline RMSE with an average of all ratings
+mu_hat <- mean(train_soa_final$y)
+rmse_ave <- rmse(test_soa_final$y, mu_hat)
+rmse_results_soa <- tibble(method = "Mean of all locations", rmse = rmse_ave)
+rmse_results_soa %>% knitr::kable()
+# tidy
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+# load("rda/rmse_results_soa.rda")
+load("rda/rmse_results.rda")
+rmse_results %>% knitr::kable()
+
+#### visualisation
+#graph the geographic areas
+load("rda/main_soa.rda")
+load("rda/main.rda")
+
+main_soa %>%  ggplot(aes(all_residents))  + 
+  geom_histogram(bins = 30, color = "black") +
+  ggtitle("Size of the geographic areas") +
+  xlab("number of residents in the SOA area") +
+  ylab("count of numbers of SOA areas")
+#table of key data points of the sizes of the SOA areas
+main_soa_summary <- c(mean = mean(main_soa$all_residents),
+                      sd=sd(main_soa$all_residents),
+                      max = max(main_soa$all_residents), 
+                      min = min(main_soa$all_residents))
+#table of key data points of the sizes of the MSOA areas
+main_summary <- c(mean = mean(main$all_residents),
+                     sd=sd(main$all_residents),
+                     max = max(main$all_residents), 
+                     min = min(main$all_residents))
+# displaying in a table for comparison
+data.frame(main_soa_summary) %>% 
+  cbind(data.frame(main_summary)) %>%
+  knitr::kable()
+# tidy
+rm(main, main_soa, main_soa_summary, main_summary)
+
+#graph the outcome y
+tmp <- data.frame(SOA=train_soa_final$y) %>%
+  pivot_longer(cols = SOA,
+               names_to = "area_type", 
+               values_to = "y")
+data.frame(MSOA=train_set_final$y) %>%
+  pivot_longer(cols = MSOA,
+               names_to = "area_type", 
+               values_to = "y") %>%
+  rbind(tmp) %>%
+  ggplot(aes(y))  + 
+  geom_histogram(bins = 30, color = "black") + 
+  facet_grid(area_type~., scales="free_y") +
+  ggtitle("Distribution of the outcome, y for SOA and MSOA areas") +
+  xlab("y, proportions of people in managerial or professional occupations") +
+  ylab("count of numbers of areas")
+
+#table of key data points of the outcome y
+# summary info for the SOA data
+train_soa_summary <- c(mean = mean(train_soa_final$y),
+                             sd=sd(train_soa_final$y),
+                             max = max(train_soa_final$y), 
+                             min = min(train_soa_final$y))
+# summary info for the MSOA data
+train_soa_summary <- c(mean = mean(train_set_final$y),
+                             sd=sd(train_set_final$y),
+                             max = max(train_set_final$y), 
+                             min = min(train_set_final$y))
+# displaying in a table for comparison
+data.frame(train_soa_summary) %>% 
+  cbind(data.frame(train_soa_summary)) %>%
+  knitr::kable()
+# tidy
+rm(tmp, train_soa_final_summary, train_set_final_summary)
+
+# graph illustrating the impact of London or Yorkshire
+test_soa_final %>%
+  select(y, london, yorkshire_humber) %>%
+  pivot_longer(cols=c("london", "yorkshire_humber"), 
+               names_to="region", values_to="true") %>%
+  filter(true=="1") %>%
+  select(-true) %>%  
+  ggplot(aes(y, fill=region))  + 
+  geom_histogram(bins = 30) +
+  ggtitle("Distribution of the outcome, y for regions") +
+  xlab("y, proportions of people in managerial or professional occupations") +
+  ylab("count of numbers of SOA areas")
+
+#looking at the features
+#box plot 
+train_soa_final %>%  
+  #pivot to a long version with a row per feature/value
+  pivot_longer(cols = (contains("25_64") | contains("ratio")), 
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(x=reorder(feature, proportion, FUN=mean), y=proportion))  + 
+  geom_boxplot() +
+  ggtitle("Boxplot of features for the SOA") +
+  ylab("proportion") + 
+  xlab("feature name, reordered by mean") + 
+  theme(axis.text.x=element_text(angle = 90, hjust=1, vjust=0.5))
+
+#### modelling on the train/test data
+# GLM
+# with the full train set
+result_glm_train_soa <- 
+  results_train_method(train_soa_final, test_soa_final, "glm")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                          tail(result_glm_train_soa$results, 1))
+rmse_results_soa %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_glm_train_soa$train, scale=FALSE)
+plot(importance, 20)
+importance$importance
+# tidy up
+importance_soa_glm <- importance 
+save(result_glm_train_soa, file="rda/result_glm_train_soa.rda")
+save(importance_soa_glm, file="rda/importance_soa_glm.rda")
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+rm(importance)
+rm(result_glm_train_soa)
+
+##### GBM
+# using the gbmm plyr, package
+if (!require('gbm')) install.packages('gbm'); library('gbm')
+if (!require('plyr')) install.packages('plyr'); library('plyr')
+# with the full train set
+result_gbm_train_soa <- 
+  results_train_method(train_soa_final, test_soa_final, "gbm")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                              tail(result_gbm_train_soa$results, 1))
+rmse_results_soa %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_gbm_train_soa$train, scale=FALSE)
+plot(importance, 20)
+#tidy
+importance_soa_gbm <- importance 
+save(importance_soa_gbm, file="rda/importance_soa_gbm.rda")
+save(result_gbm_train_soa, file="rda/result_gbm_train_soa.rda")
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+rm(importance)
+rm(result_gbm_train_soa)
+
+#### Boosted Generalized Linear Model - glmboost
+# uses the plyr, mboost packages
+if (!require('mboost')) install.packages('mboost'); library('mboost')
+if (!require('plyr')) install.packages('plyr'); library('plyr')
+# with the full training set
+result_glmboost_train_soa <- 
+  results_train_method(train_soa_final, test_soa_final, "glmboost")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                          tail(result_glmboost_train_soa$results, 1))
+rmse_results_soa %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_glmboost_train_soa$train, scale=FALSE)
+plot(importance, 20)
+
+#tidy
+importance_soa_glmboost <- importance 
+save(result_glmboost_train_soa, file="rda/result_glmboost_train_soa.rda")
+save(importance_soa_glmboost, file="rda/importance_soa_glmboost.rda")
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+rm(importance)
+rm(result_glmboost_train_soa)
+
+
+# top 28 features
+# using GLM, GBM, GLM boost to rank features
+load("rda/importance_soa_gbm.rda")
+load("rda/importance_soa_glm.rda")
+load("rda/importance_soa_glmboost.rda")
+#create ranking for gbm algorithm, with normalised score
+gbm_soa_rank <- importance_soa_gbm$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(gbm_rank = 1:length(importance_soa_gbm$importance$Overall))) %>%
+  mutate("gbm_overall" = Overall/max(Overall)) %>% 
+  select(-Overall)
+head(gbm_soa_rank)
+#create ranking for glm algorithm, with normalised score
+glm_soa_rank <- importance_soa_glm$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(glm_rank = 1:length(importance_soa_glm$importance$Overall))) %>%
+  mutate("glm_overall" = Overall/max(Overall)) %>% 
+  select(-Overall)
+head(glm_soa_rank)
+#create ranking for glmboost algorithm, with normalised score
+glmboost_soa_rank <- importance_soa_glmboost$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(glmboost_rank = 1:length(importance_soa_glmboost$importance$Overall))) %>%
+  mutate("glmboost_overall" = Overall/max(Overall)) %>% 
+  select(-Overall)
+head(glmboost_soa_rank)
+# combined ranking table, with mean, and reordered
+feature_rank <- glm_soa_rank %>%
+  left_join(gbm_soa_rank) %>%
+  left_join(glmboost_soa_rank) %>%
+  dplyr::mutate(mean_rank = (glm_rank+gbm_rank+glmboost_rank)/3, .after = "feature") %>%
+  dplyr::mutate(mean_overall = (glm_overall+gbm_overall+glmboost_overall)/3, .after = "feature") %>%
+  arrange(desc(mean_overall)) 
+head(feature_rank)
+
+# load("rda/feature_rank_soa.rda")
+#create new training set, using the function from earlier
+train_soa_top28 <- topfeature_overall(28, train_soa_final)
+
+# tidy up
+save(feature_rank, file="rda/feature_rank_soa.rda")
+save(train_soa_top28, file="rda/train_soa_top28")
+# load("rda/train_soa_top28")
+
+#### SVM radial
+# uses package kernlab
+if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
+# with the full train set
+result_svmradial_train_soa <- 
+  results_train_method(train_soa_final, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                          tail(result_svmradial_train_soa$results, 1))
+rmse_results_soa %>% knitr::kable()
+# poor performance, lots of errors
+# with the top28 train set
+result_svmradial_train_soa_top28 <- 
+  results_train_method(train_soa_top28, test_soa_final, "svmRadial")
+# failed
+# training with 15 features
+# load("rda/feature_rank_soa.rda")
+#create new training set, using the function from earlier
+train_soa_top5 <- topfeature_overall(5, train_soa_final)
+train_soa_top10 <- topfeature_overall(10, train_soa_final)
+train_soa_top15 <- topfeature_overall(15, train_soa_final)
+# with the top15 train set
+result_svmradial_train_soa_top15 <- 
+  results_train_method(train_soa_top15, test_soa_final, "svmRadial")
+# with the top5 train set
+result_svmradial_train_soa_top5 <- 
+  results_train_method(train_soa_top5, test_soa_final, "svmRadial")
+#sampling the 5000 observations
+set.seed(2001, sample.kind="Rounding")
+index <- sample(1:nrow(train_soa_final), 5000, replace = FALSE)
+train_soa_5k <- train_soa_final[index,]
+#create new training set, using the function from earlier
+train_soa_5k_top5 <- topfeature_overall(5, train_soa_5k)
+# with the 5k top5 train set
+result_svmradial_train_soa_5k_top5 <- 
+  results_train_method(train_soa_5k_top5, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                              tail(result_svmradial_train_soa_5k_top5$results, 1))
+# with the 5k top10 train set
+train_soa_5k_top10 <- topfeature_overall(10, train_soa_5k)
+# training the model
+result_svmradial_train_soa_5k_top10 <- 
+  results_train_method(train_soa_5k_top10, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                              tail(result_svmradial_train_soa_5k_top10$results, 1))
+# with the 5k top15 train set
+train_soa_5k_top15 <- topfeature_overall(15, train_soa_5k)
+# training the model
+result_svmradial_train_soa_5k_top15 <- 
+  results_train_method(train_soa_5k_top15, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                              tail(result_svmradial_train_soa_5k_top15$results, 1))
+# with the 5k top28 train set
+train_soa_5k_top28 <- topfeature_overall(28, train_soa_5k)
+# training the model
+result_svmradial_train_soa_5k_top28 <- 
+  results_train_method(train_soa_5k_top28, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                              tail(result_svmradial_train_soa_5k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+#tidy 
+save(result_svmradial_train_soa_5k_top28, 
+     file="result_svmradial_train_soa_5k_top28.rda")
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+rm(result_svmradial_train_soa_5k_top28, result_svmradial_train_soa_5k_top15)
+rm(result_svmradial_train_soa_5k_top10, result_svmradial_train_soa_5k_top5)
+# load("rda/rmse_results_soa.rda")
+#sampling the 10000 observations
+set.seed(2001, sample.kind="Rounding")
+index <- sample(1:nrow(train_soa_final), 10000, replace = FALSE)
+train_soa_10k <- train_soa_final[index,]
+# with the 10k top28 train set
+train_soa_10k_top28 <- topfeature_overall(28, train_soa_10k)
+# training the model
+result_svmradial_train_soa_10k_top28 <- 
+  results_train_method(train_soa_10k_top28, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- 
+  bind_rows(rmse_results_soa,
+            tail(result_svmradial_train_soa_10k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+
+# tidy
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+save(result_svmradial_train_soa_10k_top28, file="rda/result_svmradial_train_soa_10k_top28.rda")
+rm(result_svmradial_train_soa_10k_top28, index)
+
+#sampling the 15000 observations
+set.seed(2001, sample.kind="Rounding")
+index <- sample(1:nrow(train_soa_final), 15000, replace = FALSE)
+train_soa_15k <- train_soa_final[index,]
+# with the 15k top28 train set
+train_soa_15k_top28 <- topfeature_overall(28, train_soa_15k)
+# training the model
+result_svmradial_train_soa_15k_top28 <- 
+  results_train_method(train_soa_15k_top28, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- 
+  bind_rows(rmse_results_soa,
+            tail(result_svmradial_train_soa_15k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+# tidy
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+save(result_svmradial_train_soa_15k_top28, 
+     file="rda/result_svmradial_train_soa_15k_top28.rda")
+rm(result_svmradial_train_soa_10k_top28)
+rm(index)
+
+
+#### GAM 28
+# this uses the mgcv and nlme packages
+if (!require('mgcv')) install.packages('mgcv'); library('mgcv')
+if (!require('nlme')) install.packages('nlme'); library('nlme')
+# with the soa top 28 training set
+result_gam_train_soa_top28 <- 
+  results_train_method(train_soa_top28, test_soa_final, "gam")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                              tail(result_gam_train_soa_small_top28$results, 1))
+# with the 5k top28 SOA training set
+result_gam_train_soa_5k_top28 <- 
+  results_train_method(train_soa_5k_top28, test_soa_final, "gam")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                              tail(result_gam_train_soa_5k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_gam_train_soa_5k_top28$train, scale=FALSE)
+plot(importance, 20)
+# tidy
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+save(result_gam_train_soa_top28, file="rda/result_gam_train_soa_top28.rda")
+rm(result_gam_train_soa_top28)
+
+# with the 10k top28 SOA training set
+result_gam_train_soa_10k_top28 <- 
+  results_train_method(train_soa_10k_top28, test_soa_final, "gam")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                              tail(result_gam_train_soa_10k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+# tidy
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+save(result_gam_train_soa_10k_top28, 
+     file="rda/result_gam_train_soa_10k_top28.rda")
+
+# with the 15k top28 SOA training set
+result_gam_train_soa_15k_top28 <- 
+  results_train_method(train_soa_15k_top28, test_soa_final, "gam")
+# extract the rmse from the results
+rmse_results_soa <- 
+  bind_rows(rmse_results_soa,
+            tail(result_gam_train_soa_15k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+# tidy
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+save(result_gam_train_soa_15k_top28, 
+     file="rda/result_gam_train_soa_15k_top28.rda")
+rm(result_gam_train_soa_15k_top28)
+rmse_results_soa %>% 
+  arrange(rmse) %>% knitr::kable()
+
+
+### ensemble with SOA data
+#ensemble of SVM Radial and GBM
+load("rda/result_svmradial_train_soa_15k_top28.rda")
+load("rda/result_gbm_train_soa.rda")
+y_hat_ens_table6 <- 
+  data.frame(svmradial_y_hat = result_svmradial_train_soa_15k_top28$y_hat, 
+             gbm_y_hat = result_gbm_train_soa$y_hat) %>%
+  #calculate average of the y_hats
+  mutate(y_hat_ave = rowMeans(.))
+#test against the actual values
+rmse_ens <- rmse(test_soa_final$y, y_hat_ens_table6$y_hat_ave)
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                          tibble(method="Ensemble svmRadial, gbm",  
+                                 rmse = rmse_ens))
+rmse_results_soa %>%
+  # arrange(rmse) %>% head(10) %>% knitr::kable()
+  arrange(rmse) %>% knitr::kable()
+
+# tidy up
+save(y_hat_ens_table6, file="rda/y_hat_ens_table6.rda")
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+rm(rmse_ens)
+rm(y_hat_ens_table6)
+rm(result_svmradial_train_soa_15k_top28, result_gbm_train_soa)
+
+## visualisation of errors
+# looking at the best ensemble model, and constituent ones svmRadial and gbm
+# plot of y against y_hat for all three
+y_hat_ens_table6 %>%
+  cbind(y = test_soa_final$y) %>%
+  rename(ensemble_y_hat=y_hat_ave) %>%
+  pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
+  ggplot(aes(x=y_hat, y=y, col=model)) +
+  geom_point() +  
+  geom_abline(slope = 1, intercept = 0, col="black")  +
+  facet_grid(. ~model) +
+  ggtitle("Comparing ensemble SOA predictions vs the outcome y") +
+  xlab("model predictions") +
+  ylab("actual values, y") + 
+  theme(legend.position = "bottom")
+
+# histogram of deltas for all three
+y_hat_ens_table6 %>%
+  cbind(y = test_soa_final$y) %>%
+  mutate(svmradial_delta = (y-svmradial_y_hat)) %>%
+  mutate(gbm_delta = (y-gbm_y_hat)) %>%
+  mutate(ensemble_delta = (y-y_hat_ave)) %>%
+  select(-svmradial_y_hat, -gbm_y_hat, -y_hat_ave) %>%
+  pivot_longer(cols=contains("delta"), names_to="model", values_to="delta") %>%
+  ggplot(aes(delta, fill=model)) +
+  geom_histogram(bins = 30) +
+  facet_grid(. ~model) +
+  ggtitle("Comparing ensemble SOA predictions vs the outcome y") +
+  xlab("delta between y and the model predictions") +
+  ylab("number of predictions in each interval") +
+  theme(legend.position = "bottom")
+
+# comparing the svmradial and gam models
+y_hat_ens_table6 %>%
+  cbind(y = test_soa_final$y) %>%
+  select(-y_hat_ave) %>%
+  pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
+  ggplot(aes(x=y_hat, y=y, col=model)) +
+  geom_point()  +
+  geom_abline(slope = 1, intercept = 0, col="black") +
+  ggtitle("Comparing gbm and svm radial predictions vs the outcome y") +
+  xlab("model predictions") +
+  ylab("actual values, y") 
+
+# tidy
+rm(result_gam_train_soa_10k_top28)
+rm(result_gbm_train_soa)
+rm(result_svmradial_train_soa_15k_top28)
+rm(tmp)
 
 #### feature importance ####
 

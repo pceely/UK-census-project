@@ -54,14 +54,13 @@ Key steps carried out:
 7.  Training and testing a variety of models   
 8.  Building an ensemble
 9.  Finalising a model and running on the validation set
-10. Interpretation, and investigation in to feature importance
+10. Run on more detailed data set to confirm the models
+11. Interpretation, and investigation in to feature importance
 
 The methodology and code was developed using insight gained from the course, and also in the accompanying text book **An Introduction to Data Science, by Rafael A Irizarry,  https://rafalab.github.io/dsbook/**.
 
 # Methodology
 <!-- a methods/analysis section that explains the process and techniques used, including data cleaning, data exploration and visualization, insights gained, and your modeling approaches (you must use at least two different models or algorithms); -->
-
-
 
 ## Identification of data sources
 <!-- 1.  Identify potentially useful data from the UK Census -->
@@ -70,13 +69,13 @@ The most recent census in the UK is in 2011.  There are various sources and I us
 
 This in turn provided a link to the Nomis web site, provided buy Durham University on behalf of the ONS, as the official labour market statistics.  The following link provides a list of the tables from the 2011 UK census  https://www.nomisweb.co.uk/census/2011/data_finder 
 
-The most granular data is provided for "output area" (OA) an area defined for the census, of at least 100 people, but aiming for larger than 125 households, and therefore I will use that for the final modelling, which provides over 130,000 data points providing a good level of detail and variability.
+The most granular data is provided for "output area" (OA) an area defined for the census, of at least 100 people, but aiming for larger than 125 households, which provides over 130,000 data points providing a good level of detail and variability.  This is a very large data set, and will be difficult to handle, for someone new to this, and therefore I will focus this study on a smaller data set, however, I will test with the SOA at the end to validate the work.
 
-However, to prove the methodology I will be using the Middle layer Super Output Areas - 2011" (MSOA) which gives around 7000 areas to work with.
+For this project, I will be using the Middle layer Super Output Areas - 2011" (MSOA) which gives around 7000 areas to work with.
 
 In order to prove the methodology particularly of the source data process, data preparation, cleanup and cross checking the numbers between the tables I will work with the "regions" geographic ares. 
 
-There appears to be more detailed data available for England and Wales, enabling further clean up (for example, to baseline on the same totals), and therefore this will be used.
+There appears to be more detailed data available for England and Wales, enabling further clean up (for example, to baseline on the same totals, working age and so on), and therefore this will be used.
 
 The following are the data tables from the census used to construct the data.  I have focused here on indicators, trying to avoid ones which may be due to a good job such as size of house and so on.
 
@@ -115,8 +114,11 @@ It may be possible to map the occupation to earnings with other data, such as:
 https://www.ons.gov.uk/datasets/ashe-table-8-earnings/editions/time-series/versions/1#id-dimensions.
 
 
+
 ## Data preparation
 <!-- 2.  Import data, clean up, create the values to predict -->
+
+In summary, for this study I will be using the MSOA geographic areas for England and Wales, with data sourced from 9 tables from the nomis census data.
 
 I will re-baseline all of the data to a similar cohort as the occupation data., and then calculate all the values as a proportion of that area, so a fraction of 1, and this is what I will use for all of the data points, with a 3 decimal accuracy.
 
@@ -125,7 +127,7 @@ I will re-baseline all of the data to a similar cohort as the occupation data., 
 
 I created a function to download the files from Nomis, and then saved all the csv files to the ~/data directory.
 
-``` {r downloading data from nomis}
+``` {r downloading data from nomis, eval=FALSE}
 # function to create download file from nomis 
 nomis_census_csv <- function(censusdata, geographytype){
   # generate filename
@@ -149,7 +151,7 @@ nomis_census_csv <- function(censusdata, geographytype){
 }
 ```
 
-and then created a mapping to download various census tables at once
+And then created a mapping to download various census tables at once
 
 ```{r mapping to download census files, eval=FALSE}
 censusdata_list <- c("ks501ew", "ks103ew", "ks209ew", "ks105ew", "ks605ew", "qs203ew")
@@ -164,13 +166,13 @@ tmp <- lapply(censusdata_list, function(censusdata){
 })
 ```
 
-finally I created a function to import the data in to R from the file created:
+Finally I created a function to import the data in to R from the file created:
 
 ```{r function to import in to R, eval=FALSE}
-ingest <- function(censustable){
+ingest <- function(censustable, geography){
   print(paste("ingesting", censustable))
   # generate file name for loading
-  filename <- paste(censustable, geographytype, sep = "_") %>%
+  filename <- paste(censustable, geography, sep = "_") %>%
     paste0(., ".csv") %>%
     paste0("data/", .)
   print(filename)
@@ -178,13 +180,10 @@ ingest <- function(censustable){
   # data <- read_csv(filename)
   return(read_csv(filename))
 }
-
-#load in occupation data
-data <- ingest("ks608ew")
 ```
 
 
-### Create value to predict
+### Create the value to predict
 
 This requires working with the occupation information in table ks608.
 
@@ -200,9 +199,9 @@ There are 9 Occupation types, and we are combining the first two and the remaini
 * Occupation: 8. Process plant and machine operatives 
 * Occupation: 9. Elementary occupations
 
-The $y$ value is then simply the ratio of Occupations 1 and 2, and the sum of all occupations.
+The $y$ value is then simply the ratio of the sum of Occupations 1 and 2, and the sum of all occupations.
 
-```{r create the y value}
+```{r create the y value, eval=FALSE}
 #load in occupation data
 # https://www.nomisweb.co.uk/census/2011/ks608ew
 # import the new table with occupation data
@@ -230,7 +229,7 @@ Now, one by one I need to bring in the other data points, potential predictors/f
 
 Starting with the Sex data set, which also includes the total number of people.  It can be seen that the number of people in the Occupation table is roughly half of the total.  On the other hand, the Sex data is fairly static, with more women then men everywhere.  I have used the female ratio, although this is for the full population rather than the Occupation group, so may not be right.
 
-```{r ingest sex data}
+```{r ingest sex data, eval=FALSE}
 #load in residents and sex data
 data <- ingest("ks101ew")
 names(data)
@@ -254,7 +253,7 @@ We need to understand where this difference in numbers is coming from, so next w
 There are many columns, for a predictor, Median is the one I will use as it is a bit more variable than mean.
 Typically in the census, there is a breakdown of 16-74, below and above, which I have used to see how the data stacks up with the other elements, as well as 20-64, and it can be seen that the working age is still higher than the Occupation total.
 
-```{r ingesting the age information}
+```{r ingesting the age information, eval=FALSE}
 data <- ingest("ks102ew")
 names(data)
 age <- data %>%
@@ -281,7 +280,7 @@ data_set %>%
 
 Still trying to understand the numbers, there is an Economic activity table, https://www.nomisweb.co.uk/census/2011/ks601ew, which I will look at.
 
-```{r economic activity}
+```{r economic activity, eval=FALSE}
 # checking economic activity
 nomis_census_csv("ks601ew", geographytype)
 data <- ingest("ks601ew")
@@ -317,7 +316,7 @@ Next I needed to normalise the data (dividing by the total population), finding 
 
 There are reported differences for outcomes for Bangladeshi Britons, and so this seems a good cut off of around 0.5%, and I will aggregate other ethnicities following the structure already in place.  The top ones are
 
-```{r priority ethinicities}
+```{r priority ethinicities, eval=FALSE}
 ethnicity_ordered <- column_to_rownames(ethnicity_raw, var="geography_code")
 ethnicity_ordered <- ethnicity_ordered %>%  rbind("total" = colSums(ethnicity_ordered))
 ethnicity_ordered <- ethnicity_ordered[, order(-ethnicity_ordered[which(rownames(ethnicity_ordered) == 'total'), ]) ]
@@ -326,16 +325,41 @@ names(ethnicity_ordered) %>% head(12)
 
 After this aggregation, I now need to divide by the sums of the rows, to have a normalised value for each of the ethnicities, as a ratio of one.  This was carried out and the values added to the data_set.
 
-#### Sex/gender for 35 to 64
+#### Sex/gender in the working age population
 
-Here I am intending to create a new female ratio, using the same 25 to 64 group as for ethnicities, and also using the same source data.
+Earlier I created a feature for sex/gender, but that was for the full population, and I think it would be better to create one for working age, which I will do here.Here I am intending to create a new female ratio, using the same 25 to 64 group as for ethnicities, and also using the same source data.
+
+```{r sex gender feature creation, eval=FALSE}
+# next to load in the sex/gender data, for ages 25 to 64 
+# https://www.nomisweb.co.uk/census/2011/lc2101ew
+# using the ethnicity data, which includes gender
+data <- ingest("lc2101ew", geographytype)
+#creating the raw file
+sex_25_64 <- data %>%
+  #filtering all ethnicities
+  select(contains("Ethnic Group: All categories:") | contains("geography code") ) %>%
+  #filtering to the age groups in question
+  select(contains("Age 25 to 49") | contains("Age 50 to 64") | contains("geography code") ) %>%
+  #mutate to create the sums for comparison
+  rowwise() %>%
+  mutate("all_25_64"= sum(across(contains("Sex: All Persons")))) %>%
+  mutate("female_25_64"= sum(across(contains("Sex: Female")))) %>%
+  mutate("male_25_64"= sum(across(contains("Sex: Males")))) %>%
+  mutate("checksum" = female_25_64 + male_25_64) %>%
+  mutate(female_ratio_25_64 = female_25_64/all_25_64)%>% 
+  rename("geo_code" = "geography code") 
+#limit to the two columns necessary
+sex_25_64 <- sex_25_64 %>%
+  select(contains("female_ratio_25_64") | contains("geo_code") )
+```
 
 This reduces the ratio a little, still in favour of women but less so, presumably due to women living longer.  This will be the ratio used as a predictor, and I have deleted the other one.
 
 #### Qualifications
 
 Using the same methodology as before, with the new table including ages, limiting to 25 to 64, and normalising for each geo area.
-https://www.nomisweb.co.uk/census/2011/lc5102ew
+
+
 
 #### Marital status
 
@@ -599,7 +623,7 @@ The information is described here:
 There is a lookup file provided which I will use to include the feature.
 https://borders.ukdataservice.ac.uk/lut_download_data.html?data=oa11_lsoa11_msoa11_lad11_ew_lu.
 
-Following is the code to carry out the mapping, which groups the over 7000 MSOAs in to 348 local areas.
+Following is the code to carry out the mapping, which groups the over 7000 MSOAs and 130000 SOAs in to 348 local areas.
 
 ```{r adding the local area}
 # getting the mapping for the locations
@@ -616,16 +640,13 @@ head(geo_mapping)
 # for the columns of interest are MSOA11CD (MSOA), OA11CD (SOA) and LAD11CD
 load("rda/geo_mapping.rda")
 geo_lookup <- geo_mapping %>%
-  #for the MSOA
-  select(MSOA11CD, LAD11CD) %>%
-  rename(local_area = LAD11CD, geo_code = MSOA11CD) %>%
-  #for the SOA
-  # select(OA11CD, LAD11CD) %>%
-  # rename(local_area = LAD11CD, geo_code = OA11CD) %>%
+  #for the MSOA and SOA
+  select(LAD11CD, OA11CD, MSOA11CD, ) %>%
+  rename(local_area = LAD11CD, geo_code_soa=OA11CD, geo_code_msoa = MSOA11CD) %>%
   unique()
 head(geo_lookup)
-#however, for many models to work, the feature needs to be numeric, so I need to convert the character strings to numbers
-#calculating a list of strings within the local area to be rewritten as numbers.  Rewriting as much as possible
+#however, for many models to work, the feature needs to be numeric, so I need to convert the character strings to numbers, so remove the "E"
+#calculating a list of strings within the local area to be rewritten as numbers, keeping the strings replaced as long as possible to reduce the length of the area_code
 area_update <- levels(as.factor(str_sub(geo_lookup$local_area, 1, -3)))
 #create a new column to be updated
 geo_lookup <- geo_lookup %>%
@@ -658,8 +679,6 @@ I can use this to create a further lookup to a specific region, and then use tha
 to create the columns.  I will use names for ease of understanding, and add to the geo_lookup created earlier.
 
 ```{r create region columns}
-
-#but this may not work for some algorithms
 # in addition creating a column per region
 # https://opendata.arcgis.com/datasets/0aac9db88cbb4f8d9db42ad20b03cb71_0.csv
 #download file
@@ -688,6 +707,7 @@ region_lookup <- region_mapping %>%
   select(local_area, region) %>%
   unique()
 levels(as.factor(region_lookup$region))
+head(region_lookup)
 # update empty fields to be "wales"
 # not using this as it matches the isles of scilly as well
 # index <- str_length(region_mapping$region) == "0"
@@ -715,21 +735,38 @@ region_table <- sapply(region_list, function(region){
 head(region_table)
 head(region_lookup, 20)
 region_lookup <- region_lookup %>% cbind(as.data.frame(region_table))
-# save completed lokup for later
+# save completed lookup for later
 save(region_lookup, file='rda/region_lookup.rda')
 head(region_lookup, 50)
 tail(region_lookup, 20)
 head(geo_lookup)
+sum(is.na(region_lookup))
 #add to the geo_lookup file
 geo_lookup <- geo_lookup %>%
   left_join(region_lookup) %>%
   select(-region)
+#this has created some NAs, so need to fix
+geo_lookup[is.na(geo_lookup)] <- 0
+sum(is.na(geo_lookup))
 head(geo_lookup)
 #number of local areas
-print("number of local areas")
 length(levels(as.factor(geo_lookup$area_code)))
 #tidy up
 save(geo_lookup, file='rda/geo_lookup.rda')
+
+# load("rda/main.rda")
+# load("rda/main_tidy.rda")
+load("rda/geo_lookup.rda")
+#add to the data set
+main_new <- geo_lookup %>%
+  mutate(geo_code=geo_code_msoa) %>%
+  select(-geo_code_soa) %>% 
+  unique() %>%
+  right_join(main) %>%
+  select(-local_area, -geo_code_msoa)
+#number of local areas
+print("number of local areas")
+length(levels(as.factor(main_new$area_code)))
 ```
 
 Finally a graph to see if there is regional variation.  I think it is possible to see that for the areas with higher proportion of managerial and professional roles, they tend to be in Lond and the South East.
@@ -741,7 +778,9 @@ load("rda/region_lookup.rda")
 load("rda/geo_lookup.rda")
 # use the geo lookup and region from the region_lookup
 geo_lookup %>% 
+  mutate(geo_code=geo_code_msoa) %>%
   select(geo_code, local_area) %>%
+  unique() %>%
   left_join(region_lookup, by = "local_area") %>%
   select(geo_code, region) %>%
   #add the main data with y
@@ -765,7 +804,6 @@ This leads to the following insight and recommendations:
 * remove occupation & all_residents population numbers, geo name  & geo type
 * some features have little variation, and could be removed if needed
 * some features are highly correlated and could be removed if needed
-
 
 
 ## Creating training and test data sets
@@ -2867,7 +2905,669 @@ y_hat_ens_main %>%
 
 ## Running the models with the SOA data
 
+I have carried out the analysis so far with MSOA data, around 7000 observations, nationwide.  I will now work with the SOA data, considerably more detailed.
 
+Rather than all 130,000 entries, I will focus on two SOA areas, London and Yorkshire and The Humber, as these will have some variety in the types of areas, roles and people.  The London set had 25,053 observations, and the Yorkshire had 17,275, making 42,328 in total.
+
+### Importing the data
+
+In turn for London and Yorkshire, the code will download the csv data from Nomis, using the function created earlier, and then run the functions to extract the features and create the "data_set" object.
+
+```{r import london and yorkshire data}
+### downloading the SOA data
+# choosing London and Yorkshire
+# "2013265927TYPE299">output areas 2011 in London
+# "2013265923TYPE299">output areas 2011 in Yorkshire and The Humber
+#creating list of census tables to take
+censusdata_list <- c("ks608ew", "ks102ew", "lc2101ew", "lc2103ew","lc6110ew", "lc1109ew", "lc2107ew", "lc1101ew", "lc5102ew")
+
+# London
+# apply the list to download all of the data
+download_censusdata("2013265927TYPE299", censusdata_list)
+#import the data for London
+data_set <- import_data("2013265927TYPE299")
+#clean up
+data_set_london <- data_set
+rm(filename)
+rm(geographytype)
+
+# "2013265923TYPE299">output areas 2011 in Yorkshire and The Humber
+geographytype <- "2013265923TYPE299" # output areas 2011 in Yorkshire and The Humber
+# apply the list to download all of the data
+download_censusdata("2013265923TYPE299", censusdata_list)
+#import the data for Yorkshire
+data_set <- import_data("2013265923TYPE299")
+data_set_yorkshire <- data_set
+# load("rda/data_set_2013265923TYPE299.rda")
+```
+
+Then I combined in to a single data set (adding rows together) before creating the main/validation sets, and the train/test.
+
+```{r create soa main and train sets}
+
+#combine in to one data set
+data_set <- data_set_london %>%
+  rbind(data_set_yorkshire)
+# tidy
+save(data_set, file="rda/data_set_lon_york.rda")
+
+#### create main and validation set
+# Validation set will be 10% of the data
+set.seed(2011, sample.kind="Rounding")
+test_index <- createDataPartition(y = data_set$y, times = 1, p = 0.1, list = FALSE)
+main_soa <- data_set[-test_index,]
+validation_soa <- data_set[test_index,]
+### tidy, take backup:
+save(main_soa, file='rda/main_soa.rda')
+save(validation_soa, file='rda/validation_soa.rda')
+rm(validation_soa, data_set, test_index)
+
+#### create test and train set
+load("rda/main_soa.rda")
+# load("rda/main_tidy.rda")
+# test set will be 10% of the data
+set.seed(2001, sample.kind="Rounding")
+test_index <- createDataPartition(y = main_soa$y, times = 1, p = 0.1, list = FALSE)
+train_soa <- main_soa[-test_index,]
+test_soa <- main_soa[test_index,]
+#check
+names(train_soa)
+sum(is.na(train_soa))
+### tidy, take backup:
+save(train_soa, file='rda/train_soa.rda')
+save(test_soa, file='rda/test_soa.rda')
+rm(main_soa, main_tidy_soa, main_new_soa, test_index)
+load("rda/test_soa.rda")
+load("rda/train_soa.rda")
+
+#data cleanse on the test set and train set
+load("rda/geo_lookup.rda")
+test_soa_final <- data_cleanse(test_soa, "soa")
+train_soa_final <- data_cleanse(train_soa, "soa")
+
+#check
+names(test_soa_final)
+names(test_soa)
+head(test_soa_final$area_code)
+head(test_soa$geo_code)
+#check the number of local areas is correct
+# means 54 sub regions in London and Yorkshire
+length(levels(as.factor(test_soa_final$area_code)))
+length(levels(as.factor(train_soa_final$area_code)))
+names(train_soa_final)
+# check, the sum of London and Yorkshire is all of the locations, 3811
+sum(test_soa_final$london) + sum(test_soa_final$yorkshire_humber)
+# no NA
+sum(is.na(train_soa_final))
+sum(is.na(test_soa_final))
+# tidy up
+save(test_soa_final, file="rda/test_soa_final.rda")
+save(train_soa_final, file="rda/train_soa_final.rda")
+rm(test_soa, train_soa, geo_mapping, geo_lookup, main_soa)
+
+#### baseline rmse and rmse function
+# load the test and train data
+load("rda/test_soa_final.rda")
+load("rda/train_soa_final.rda")
+options(digits = 6)
+# baseline RMSE with an average of all ratings
+mu_hat <- mean(train_soa_final$y)
+rmse_ave <- rmse(test_soa_final$y, mu_hat)
+rmse_results_soa <- tibble(method = "Mean of all locations", rmse = rmse_ave)
+rmse_results_soa %>% knitr::kable()
+```
+
+
+### Initial baseline and visualisation
+
+Firstly I created the initial baseline RMSE based on the mean, which is 0.133419, much worse than the MSOA data which was 0.096470.  I expected this, as I was hoping that the variability with the smaller areas would be greater.  It could be that focusing on two more extreme areas in the UK could exacerbate this.
+
+```{rmse baseline for SOA}
+#### baseline rmse and rmse function
+# load the test and train data
+load("rda/test_soa_final.rda")
+load("rda/train_soa_final.rda")
+options(digits = 6)
+# baseline RMSE with an average of all ratings
+mu_hat <- mean(train_soa_final$y)
+rmse_ave <- rmse(test_soa_final$y, mu_hat)
+rmse_results_soa <- tibble(method = "Mean of all locations", rmse = rmse_ave)
+rmse_results_soa %>% knitr::kable()
+load("rda/rmse_results.rda")
+rmse_results %>% knitr::kable()
+```
+
+Looking first at the sizes, the areas are roughly 25 times smaller than the MSOA, although the maximum is surprisingly large.
+
+```{r checking the sizes of the SOA}
+#graph the geographic areas
+load("rda/main_soa.rda")
+load("rda/main.rda")
+
+main_soa %>%  ggplot(aes(all_residents))  + 
+  geom_histogram(bins = 30, color = "black") +
+  ggtitle("Size of the geographic areas") +
+  xlab("number of residents in the SOA area") +
+  ylab("count of numbers of SOA areas")
+#table of key data points of the sizes of the SOA areas
+main_soa_summary <- c(mean = mean(main_soa$all_residents),
+                      sd=sd(main_soa$all_residents),
+                      max = max(main_soa$all_residents), 
+                      min = min(main_soa$all_residents))
+#table of key data points of the sizes of the MSOA areas
+main_summary <- c(mean = mean(main$all_residents),
+                     sd=sd(main$all_residents),
+                     max = max(main$all_residents), 
+                     min = min(main$all_residents))
+# displaying in a table for comparison
+data.frame(main_soa_summary) %>% 
+  cbind(data.frame(main_summary)) %>%
+  knitr::kable()
+# tidy
+rm(main, main_soa, main_soa_summary, main_summary)
+```
+
+As expected, the histograms of the outcome y do show greater variability than the MSOA, with some areas with no one in the managerial and professional roles.
+
+```{r graphs comparing y histogram for SOA and MSOA}
+#graph the outcome y
+tmp <- data.frame(SOA=train_soa_final$y) %>%
+  pivot_longer(cols = SOA,
+               names_to = "area_type", 
+               values_to = "y")
+data.frame(MSOA=train_set_final$y) %>%
+  pivot_longer(cols = MSOA,
+               names_to = "area_type", 
+               values_to = "y") %>%
+  rbind(tmp) %>%
+  ggplot(aes(y))  + 
+  geom_histogram(bins = 30, color = "black") + 
+  facet_grid(area_type~., scales="free_y") +
+  ggtitle("Distribution of the outcome, y for SOA and MSOA areas") +
+  xlab("y, proportions of people in managerial or professional occupations") +
+  ylab("count of numbers of areas")
+```
+
+And the table comparing demonstrates this, with the same mean, but larger standard deviation and broader max and minimum.
+
+```{r table of key data for the SOA}
+#table of key data points of the outcome y
+# summary info for the SOA data
+train_soa_summary <- c(mean = mean(train_soa_final$y),
+                             sd=sd(train_soa_final$y),
+                             max = max(train_soa_final$y), 
+                             min = min(train_soa_final$y))
+# summary info for the MSOA data
+train_soa_summary <- c(mean = mean(train_set_final$y),
+                             sd=sd(train_set_final$y),
+                             max = max(train_set_final$y), 
+                             min = min(train_set_final$y))
+# summary table
+data.frame(train_soa_summary) %>% 
+  cbind(data.frame(train_soa_summary)) %>%
+  knitr::kable()
+```
+
+The areas London and Yorkshire and Humber are quite different as this graph illustrates.  The London area tends to the right, with more managerial and professional roles, with very few places with very low proportion of managerial and professional.  However, Yorkshire and Humber still has some concentrated areas with lots of senior roles.
+
+```{r graph of y for different regions}
+# graph illustrating the impact of London or Yorkshire
+test_soa_final %>%
+  select(y, london, yorkshire_humber) %>%
+  pivot_longer(cols=c("london", "yorkshire_humber"), 
+               names_to="region", values_to="true") %>%
+  filter(true=="1") %>%
+  select(-true) %>%  
+  ggplot(aes(y, fill=region))  + 
+  geom_histogram(bins = 30) +
+  ggtitle("Distribution of the outcome, y for regions") +
+  xlab("y, proportions of people in managerial or professional occupations") +
+  ylab("count of numbers of SOA areas")
+```
+
+Looking at the features, they are much broader as well, with many more outliers than the previous plot on the MSOA data.  Note how the mean for UK nationals has dropped, due to half of the data coming from London which tends to be the initial destination for migrants to the UK.
+
+```{r boxplot of SOA features}
+#looking at the features
+#box plot 
+train_soa_final %>%  
+  #pivot to a long version with a row per feature/value
+  pivot_longer(cols = (contains("25_64") | contains("ratio")), 
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(x=reorder(feature, proportion, FUN=mean), y=proportion))  + 
+  geom_boxplot() +
+  ggtitle("Boxplot of features for the SOA") +
+  ylab("proportion") + 
+  xlab("feature name, reordered by mean") + 
+  theme(axis.text.x=element_text(angle = 90, hjust=1, vjust=0.5))
+```
+
+
+### Modelling
+
+#### Developing models with the train & test sets
+
+Initially I will model with the top three models with feature importance from the MSOA work, to be able to develop the top 28 features for the GAM model:
+
+* GLM
+* GBM
+* GLMBoost. 
+
+Then I will model the top 3 models:
+
+* GLM
+* SVM Radial
+* GAM top 28 features
+
+And build an ensemble with the SVM Radial and GAM 28.
+
+#### GLM on the SOA data
+
+GLM has a big improvement over the baseline, but much worse than the MSOA result, with 0.045790.  It is quick, a minute, and will surely be able to handle the full SOA data set.
+
+```{r glm on soa}
+# GLM
+# with the full train set
+result_glm_train_soa <- 
+  results_train_method(train_soa_final, test_soa_final, "glm")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                          tail(result_glm_train_soa$results, 1))
+rmse_results_soa %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_glm_train_soa$train, scale=FALSE)
+plot(importance, 20)
+importance$importance
+```
+
+#### GBM on the SOA data
+
+GBM took around fifteen minutes, and achieved a similar result to GLM, slightly better, but much worse than the result with the MSOA data.  For importance, it was almost completely reliant on the level4 qualification.
+
+```{r gbm with soa, eval=FALSE}
+# using the gbmm plyr, package
+if (!require('gbm')) install.packages('gbm'); library('gbm')
+if (!require('plyr')) install.packages('plyr'); library('plyr')
+# with the full train set
+result_gbm_train_soa <- 
+  results_train_method(train_soa_final, test_soa_final, "gbm")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                              tail(result_gbm_train_soa$results, 1))
+rmse_results_soa %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_gbm_train_soa$train, scale=FALSE)
+plot(importance, 20)
+#tidy
+importance_soa_gbm <- importance 
+```
+
+#### GLM Boost with the SOA data
+
+And GLM Boost was very quick, and the worst of the three models.
+
+```{r glmboost soa}
+#### Boosted Generalized Linear Model - glmboost
+# uses the plyr, mboost packages
+if (!require('mboost')) install.packages('mboost'); library('mboost')
+if (!require('plyr')) install.packages('plyr'); library('plyr')
+# with the full training set
+result_glmboost_train_soa <- 
+  results_train_method(train_soa_final, test_soa_final, "glmboost")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                          tail(result_glmboost_train_soa$results, 1))
+rmse_results_soa %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_glmboost_train_soa$train, scale=FALSE)
+plot(importance, 20)
+```
+
+|method                        |     rmse|
+|:-----------------------------|--------:|
+|"glm" - train_soa_final       | 0.045790|
+|"gbm" - train_soa_final       | 0.044361|
+|"glmboost" - train_soa_final  | 0.046648|
+
+#### Feature prioritisation with the SOA data
+
+With these three models I was able to build the top 28 features, and the data set with the top 28 features.
+
+```{r top 28 features with SOA}
+
+# top 28 features
+# using GLM, GBM, GLM boost to rank features
+load("rda/importance_soa_gbm.rda")
+load("rda/importance_soa_glm.rda")
+load("rda/importance_soa_glmboost.rda")
+#create ranking for gbm algorithm, with normalised score
+gbm_soa_rank <- importance_soa_gbm$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(gbm_rank = 1:length(importance_soa_gbm$importance$Overall))) %>%
+  mutate("gbm_overall" = Overall/max(Overall)) %>% 
+  select(-Overall)
+head(gbm_soa_rank)
+#create ranking for glm algorithm, with normalised score
+glm_soa_rank <- importance_soa_glm$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(glm_rank = 1:length(importance_soa_glm$importance$Overall))) %>%
+  mutate("glm_overall" = Overall/max(Overall)) %>% 
+  select(-Overall)
+head(glm_soa_rank)
+#create ranking for glmboost algorithm, with normalised score
+glmboost_soa_rank <- importance_soa_glmboost$importance %>%
+  rownames_to_column(var = "feature") %>%
+  arrange(desc(Overall)) %>% 
+  cbind(data.frame(glmboost_rank = 1:length(importance_soa_glmboost$importance$Overall))) %>%
+  mutate("glmboost_overall" = Overall/max(Overall)) %>% 
+  select(-Overall)
+head(glmboost_soa_rank)
+# combined ranking table, with mean, and reordered
+feature_rank <- glm_soa_rank %>%
+  left_join(gbm_soa_rank) %>%
+  left_join(glmboost_soa_rank) %>%
+  dplyr::mutate(mean_rank = (glm_rank+gbm_rank+glmboost_rank)/3, .after = "feature") %>%
+  dplyr::mutate(mean_overall = (glm_overall+gbm_overall+glmboost_overall)/3, .after = "feature") %>%
+  arrange(desc(mean_overall)) 
+head(feature_rank)
+
+# load("rda/feature_rank_soa.rda")
+#create new training set, using the function from earlier
+train_soa_top28 <- topfeature_overall(28, train_soa_final)
+```
+
+#### SVM Radial with the SOA data
+
+The SVM Radial model was very slow and did not work well at all, by far the worst of the models so far at 0.052583.  There were a lot of errors, and it is likely that it struggled with the size.
+
+```{r svm radial with soa, eval=FALSE}
+#### SVM radial
+# uses package kernlab
+if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
+# with the full train set
+result_svmradial_train_soa <- 
+  results_train_method(train_soa_final, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                          tail(result_svmradial_train_soa$results, 1))
+```
+
+I therefore tried with the top28 training set, but this failed after taking much longer than the earlier training.
+
+```{r svm radial with top 28, eval=FALSE}
+# with the top28 train set
+result_svmradial_train_soa <- 
+  results_train_method(train_soa_top28, test_soa_final, "svmRadial")
+```
+
+This probably means that the algorithm struggles with the amount of data, so I will try again with a smaller data set, to see if we can get it to work at all, it took a long time even with 5 features.  I followed the same process as before, creating a "small" data set with 5000 observations, and even with only 5 features, the result was pretty good, much better than with the full set earlier, with 0.0488267.
+
+```{r svm radial SOA with 5 features}
+# training with 15 features
+load("rda/feature_rank_soa.rda")
+#create new training set, using the function from earlier
+train_soa_top5 <- topfeature_overall(5, train_soa_final)
+train_soa_top10 <- topfeature_overall(10, train_soa_final)
+train_soa_top15 <- topfeature_overall(15, train_soa_final)
+# with the top15 train set
+result_svmradial_train_soa_top15 <- 
+  results_train_method(train_soa_top15, test_soa_final, "svmRadial")
+# with the top5 train set
+result_svmradial_train_soa_top5 <- 
+  results_train_method(train_soa_top5, test_soa_final, "svmRadial")
+#sampling the 5000 observations
+set.seed(2001, sample.kind="Rounding")
+index <- sample(1:nrow(train_soa_final), 5000, replace = FALSE)
+train_soa_5k <- train_soa_final[index,]
+#create new training set, using the function from earlier
+train_soa_5k_top5 <- topfeature_overall(5, train_soa_5k)
+# with the 5k top5 train set
+result_svmradial_train_soa_5k_top5 <- 
+  results_train_method(train_soa_5k_top5, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                              tail(result_svmradial_train_soa_5k_top5$results, 1))
+```
+
+I have increased the number of features to improve the SVM Radial predictions, with 28 features and 5000 observations this provides good results, 0.0452578, which is now second to the GBM model, with only a seventh of the observations available.
+
+```{r svm radial increasing model sizes}
+# with the 5k top10 train set
+train_soa_5k_top10 <- topfeature_overall(10, train_soa_5k)
+# training the model
+result_svmradial_train_soa_5k_top10 <- 
+  results_train_method(train_soa_5k_top10, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                              tail(result_svmradial_train_soa_5k_top10$results, 1))
+# with the 5k top15 train set
+train_soa_5k_top15 <- topfeature_overall(15, train_soa_5k)
+# training the model
+result_svmradial_train_soa_5k_top15 <- 
+  results_train_method(train_soa_5k_top15, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                              tail(result_svmradial_train_soa_5k_top15$results, 1))
+# with the 5k top28 train set
+train_soa_5k_top28 <- topfeature_overall(28, train_soa_5k)
+# training the model
+result_svmradial_train_soa_5k_top28 <- 
+  results_train_method(train_soa_5k_top28, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                              tail(result_svmradial_train_soa_5k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+```
+
+Trying with more observations to see how far it can go.  With 10,000 observations, it performs slightly better than GBM, at 0.044342, taking 15 minutes.  And with 15,000 observations, taking 50 minutes, and better still at 0.0438095.
+
+```{r svm radial 15k top 28}
+#sampling the 10000 observations
+set.seed(2001, sample.kind="Rounding")
+index <- sample(1:nrow(train_soa_final), 10000, replace = FALSE)
+train_soa_10k <- train_soa_final[index,]
+# with the 10k top28 train set
+train_soa_10k_top28 <- topfeature_overall(28, train_soa_10k)
+# training the model
+result_svmradial_train_soa_10k_top28 <- 
+  results_train_method(train_soa_10k_top28, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- 
+  bind_rows(rmse_results_soa,
+            tail(result_svmradial_train_soa_10k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+
+# tidy
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+save(result_svmradial_train_soa_10k_top28, file="rda/result_svmradial_train_soa_10k_top28.rda")
+rm(result_svmradial_train_soa_10k_top28, index)
+
+#sampling the 15000 observations
+set.seed(2001, sample.kind="Rounding")
+index <- sample(1:nrow(train_soa_final), 15000, replace = FALSE)
+train_soa_15k <- train_soa_final[index,]
+# with the 15k top28 train set
+train_soa_15k_top28 <- topfeature_overall(28, train_soa_15k)
+# training the model
+result_svmradial_train_soa_15k_top28 <- 
+  results_train_method(train_soa_15k_top28, test_soa_final, "svmRadial")
+# extract the rmse from the results
+rmse_results_soa <- 
+  bind_rows(rmse_results_soa,
+            tail(result_svmradial_train_soa_15k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+```
+
+
+|method                              |      rmse|
+|:-----------------------------------|---------:|
+|Mean of all locations               | 0.1334185|
+|"glm" - train_soa_final             | 0.0457900|
+|"gbm" - train_soa_final             | 0.0443612|
+|"glmboost" - train_soa_final        | 0.0466483|
+|"svmRadial" - train_soa_final       | 0.0525831|
+|"svmRadial" - train_soa_5k_top5     | 0.0488267|
+|"svmRadial" - train_soa_5k_top28    | 0.0452578|
+|"svmRadial" - train_soa_10k_top28   | 0.0443419|
+|"svmRadial" - train_soa_15k_top28   | 0.0438095|
+
+#### GAM with the SOA data
+
+Now working with the GAM model to see how that will perform.  GAM on the top 28 features with all 34,282 observations produced a result of 0.046186, behind the GLM and GBM models, surprising.  
+
+```{r GAM top 28 SOA, eval=FALSE}
+# this uses the mgcv and nlme packages
+if (!require('mgcv')) install.packages('mgcv'); library('mgcv')
+if (!require('nlme')) install.packages('nlme'); library('nlme')
+# with the soa top 28 training set
+result_gam_train_soa_top28 <- 
+  results_train_method(train_soa_top28, test_soa_final, "gam")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                              tail(result_gam_train_soa_small_top28$results, 1))
+```
+
+Perhaps it is due to the size of the data set again, so I will try with subsets as for the SVM Radial.  GAM top 28 with 5000 observations is not so good, but with 10,000 it is better than with the full set of observations, at 0.045806 close to the GLM model with 0.045790.  However, with 15,000 observations the performance was worse thatn the 10,000 sample.
+
+```{r gam top 28 SOA with different sizes, eval=FALSE}
+# with the 5k top28 SOA training set
+result_gam_train_soa_5k_top28 <- 
+  results_train_method(train_soa_5k_top28, test_soa_final, "gam")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                              tail(result_gam_train_soa_5k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_gam_train_soa_5k_top28$train, scale=FALSE)
+plot(importance, 20)
+# tidy
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+save(result_gam_train_soa_top28, file="rda/result_gam_train_soa_top28.rda")
+rm(result_gam_train_soa_top28)
+
+# with the 10k top28 SOA training set
+result_gam_train_soa_10k_top28 <- 
+  results_train_method(train_soa_10k_top28, test_soa_final, "gam")
+# extract the rmse from the results
+rmse_results_soa <- bind_rows(rmse_results_soa, 
+                              tail(result_gam_train_soa_10k_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
+# tidy
+save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+save(result_gam_train_soa_10k_top28, 
+     file="rda/result_gam_train_soa_10k_top28.rda")
+
+# with the 15k top28 SOA training set
+result_gam_train_soa_15k_top28 <- 
+  results_train_method(train_soa_15k_top28, test_soa_final, "gam")
+# extract the rmse from the results
+rmse_results_soa <- 
+  bind_rows(rmse_results_soa,
+            tail(result_gam_train_soa_15k_top28$results, 1))
+```
+
+|method                              |      rmse|
+|:-----------------------------------|---------:|
+|"gam" - train_soa_10k_top28         | 0.0458059|
+|"gam" - train_soa_top28             | 0.0461864|
+|"gam" - train_soa_15k_top28         | 0.0462241|
+|"gam" - train_soa_5k_top28          | 0.0470019|
+
+
+#### Final ensemble for the SOA data
+
+Previously for the MSOA model, I built an ensemble with the SVM Radial and GAM with 28 features.
+
+Looking at the leading models, the top two, SVM Radial and GBM have a gap to the rest, so would probably be the best ensemble.
+
+|method                              |      rmse|
+|:-----------------------------------|---------:|
+|"svmRadial" - train_soa_15k_top28   | 0.0438095|
+|"gbm" - train_soa_final             | 0.0443612|
+|"glm" - train_soa_final             | 0.0457900|
+|"gam" - train_soa_10k_top28         | 0.0458059|
+|"glmboost" - train_soa_final        | 0.0466483|
+
+I put together the ensemble of two, which provided the best result of an RMSE of 0.0431886.
+
+```{ensemble for the SOA data}
+#ensemble of SVM Radial and GBM
+load("rda/result_svmradial_train_soa_15k_top28.rda")
+load("rda/result_gbm_train_soa.rda")
+y_hat_ens_table6 <- 
+  data.frame(svmradial_y_hat = result_svmradial_train_soa_15k_top28$y_hat, 
+             gbm_y_hat = result_gbm_train_soa$y_hat) %>%
+  #calculate average of the y_hats
+  mutate(y_hat_ave = rowMeans(.))
+#test against the actual values
+rmse_ens <- rmse(test_soa_final$y, y_hat_ens_table6$y_hat_ave)
+rmse_results_soa <- bind_rows(rmse_results_soa,
+                          tibble(method="Ensemble svmRadial, gbm",  
+                                 rmse = rmse_ens))
+rmse_results_soa %>%
+  # arrange(rmse) %>% head(10) %>% knitr::kable()
+  arrange(rmse) %>% knitr::kable()
+```
+
+### Visualisation of the results
+
+Looking at the results, it is not too illuminating.  In general the distribution is a bit wider than the MSOA areas, nothing too obvious.  Apart from the higher predictions, as the models pretty much predict no proportions over 0.6, whereas the real data has values as high as 0.7.  This could be the cause of the difference with the earlier results, as the larger MSOA areas would tend to average out and reduce the higher values.
+
+```{r graph of prediction vs outcome for SOA}
+# looking at the best ensemble model, and constituent ones svmRadial and gbm
+# plot of y against y_hat for all three
+y_hat_ens_table6 %>%
+  cbind(y = test_soa_final$y) %>%
+  rename(ensemble_y_hat=y_hat_ave) %>%
+  pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
+  ggplot(aes(x=y_hat, y=y, col=model)) +
+  geom_point() +  
+  geom_abline(slope = 1, intercept = 0, col="black")  +
+  facet_grid(. ~model) +
+  ggtitle("Comparing ensemble SOA predictions vs the outcome y") +
+  xlab("model predictions") +
+  ylab("actual values, y") + 
+  theme(legend.position = "bottom")
+```
+
+The graphs of the delta from the outcome y are all sensible shapes.
+
+```{r graph of deltas from the prediction}
+# histogram of deltas for all three
+y_hat_ens_table6 %>%
+  cbind(y = test_soa_final$y) %>%
+  mutate(svmradial_delta = (y-svmradial_y_hat)) %>%
+  mutate(gbm_delta = (y-gbm_y_hat)) %>%
+  mutate(ensemble_delta = (y-y_hat_ave)) %>%
+  select(-svmradial_y_hat, -gbm_y_hat, -y_hat_ave) %>%
+  pivot_longer(cols=contains("delta"), names_to="model", values_to="delta") %>%
+  ggplot(aes(delta, fill=model)) +
+  geom_histogram(bins = 30) +
+  facet_grid(. ~model) +
+  ggtitle("Comparing ensemble SOA predictions vs the outcome y") +
+  xlab("delta between y and the model predictions") +
+  ylab("number of predictions in each interval") +
+  theme(legend.position = "bottom")
+```
+
+There is nothing obvious from this graph on where the different models are better.
+
+```{r graph comparing predictions of svm radial and gam for SOA}
+# comparing the svmradial and gam models
+y_hat_ens_table6 %>%
+  cbind(y = test_soa_final$y) %>%
+  select(-y_hat_ave) %>%
+  pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
+  ggplot(aes(x=y_hat, y=y, col=model)) +
+  geom_point()  +
+  geom_abline(slope = 1, intercept = 0, col="black") +
+  ggtitle("Comparing gbm and svm radial predictions vs the outcome y") +
+  xlab("model predictions") +
+  ylab("actual values, y") 
+```
 
 
 # Model interpretation and feature importance
@@ -2897,6 +3597,18 @@ The best models were linear regression, and variants of vector machines / gradie
 
 In the end, it seems very tightly based on the level4 qualification.
 
+
+## SOA areas
+
+The results for the SOA areas London and Yorkhire and Humber were not as good.
+
+
+|method                              |      rmse|
+|:-----------------------------------|---------:|
+|Mean of all locations               | 0.1334185|
+|"svmRadial" - train_soa_15k_top28   | 0.0438095|
+|"gbm" - train_soa_final             | 0.0443612|
+|Ensemble svmRadial, gbm             | 0.0431886|
 
 
 
