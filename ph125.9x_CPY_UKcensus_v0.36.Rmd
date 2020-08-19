@@ -325,6 +325,8 @@ names(ethnicity_ordered) %>% head(12)
 
 After this aggregation, I now need to divide by the sums of the rows, to have a normalised value for each of the ethnicities, as a ratio of one.  This was carried out and the values added to the data_set.
 
+
+
 #### Sex/gender in the working age population
 
 Earlier I created a feature for sex/gender, but that was for the full population, and I think it would be better to create one for working age, which I will do here.Here I am intending to create a new female ratio, using the same 25 to 64 group as for ethnicities, and also using the same source data.
@@ -2171,7 +2173,7 @@ glm        | linear regression    | very good      | 0.016681| fast   | yes
 svmlinear  | linear / clustering  | very good      | 0.016737| slow   | no
 gbm        | boosted trees        | good           | 0.017467| medium | yes
 rpart      | tree                 | poor           | 0.050706| fast   | yes
-ranger     | tree / random forest | ok/good        | 0.018276|slow    | no
+ranger     | tree / random forest | ok/good        | 0.018276| slow   | no
 glmboost   | boosted linear       | ok             | 0.020032| fast   | yes 
 avNNet     | deep learning        | ok/good        | 0.019568| medium | no
 gam        | regression           | good on smaller| 0.036524| slow   | no
@@ -2330,14 +2332,12 @@ train_set_final %>%
                names_to = "feature", 
                values_to = "value") %>%
   filter(feature %in% feature_top9) %>% 
-  #tidy the name to make more readable
-  rename_at(vars(ends_with("25_64")), ~str_replace_all(., "_25_64", "")) %>%
   ggplot(aes(y, value, col=feature))  + 
   geom_point() +
   facet_wrap(. ~feature,  scales = "free_y") +
-  ggtitle("Outcome y for important features")
-xlab("y, proportion of managerial & professional")
-ylab("feature values")
+  ggtitle("Outcome y for important features") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("feature values")
 ```
 
 The following features are positively correlated:
@@ -2350,8 +2350,7 @@ The following features are positively correlated:
 
 With details below extracted from the census information (http://www.ons.gov.uk/ons/guide-method/census/2011/census-data/2011-census-user-guide/information-by-variable/part-4--derived-variables.pdf).
 
-* Level 4+ qualification: Degree (for example BA, BSc), Higher Degree (for example MA, PhD, PGCE), NVQ Level 45, HNC, HND, RSA Higher Diploma, BTEC Higher level,
-Foundation degree (NI), Professional qualifications (for example teaching, nursing, accountancy)
+* Level 4+ qualification: Degree (for example BA, BSc), Higher Degree (for example MA, PhD, PGCE), NVQ Level 45, HNC, HND, RSA Higher Diploma, BTEC Higher level, Foundation degree (NI), Professional qualifications (for example teaching, nursing, accountancy)
 * Industry K - Financial and insurance activities
 * Industry L - Real estate activities
 * Industry M - Professional, scientific and technical activities
@@ -3572,12 +3571,861 @@ y_hat_ens_table6 %>%
 
 # Model interpretation and feature importance
 
-## Importance 
-Running the model without qualifications, looking for importance
+Returning back to the motivation for this topic to consider achievements of top jobs in the context of the Black lives matter society wide debate.  
+https://www.theguardian.com/business/2020/jul/28/bame-representation-uk-top-jobs-colour-of-power-survey 
+
+In this section I will look at the feature importance and correlation and see if there is data to enlighten the discussion, specifically focusing on the ethnicity features. 
+
+## Feature importance 
+
+I carried out an investigation earlier in to the most important features for the MSOA areas with the following features are positively correlated:
+
+* level4_25_64  
+* industry_klmn_25_64 
+* white_other_25_64
+* jewish_25_64 
+* age_median
+
+The following are negatively correlated:
+
+* separated_25_64
+* cohoabiting_25_64
+* no_qual_25_64
+
+Carrying out the same analysis for the SOA area, the results have more variety as expected, with a slightly different set of features in the top 9.  One interesting area is in the level4 qualifications, where for the MSOA there was a very clear correlation, but here there are a number of locations with high qualifications and low professional and managerial proportions.
+
+```{r graphs for top features for SOA}
+# plotting the top 9 for SOA
+load("rda/feature_rank_soa.rda")
+feature_rank_soa <- feature_rank
+feature_top9_soa <- feature_rank_soa %>% 
+  select(feature, mean_rank, mean_overall) %>%
+  arrange(desc(mean_overall)) %>% head(9) %>%
+  pull(feature)
+#create the plot
+train_soa_final %>%  
+  #pivot to a long version with a row per feature/value
+  pivot_longer(cols = !"y", 
+               names_to = "feature", 
+               values_to = "value") %>%
+  filter(feature %in% feature_top9_soa) %>% 
+  ggplot(aes(y, value, col=feature))  + 
+  geom_point(size=0.5) +
+  facet_wrap(. ~feature,  scales = "free_y") +
+  ggtitle("Outcome y for important features for SOA areas") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("feature values")
+```
+
+The following are positively correlated:
+
+* level4_25_64
+* industry_klmn_25_64
+* white_irish_25_64
+* jewish_25_64
+* age_median
+* marriedfamily_25_64
+* oneperson_25_64
+* cohoabiting_25_64 
+
+With only one negatively correlated:
+
+* eu_rest_25_64
+
+```{r  top feature correlation for SOA}
+#looking at correlation with y
+data.frame(cor(train_set_final)) %>%
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  filter(feature %in% feature_top9) %>% 
+  arrange(desc(abs(y))) %>%
+  knitr::kable()
+```
+
+Given that they appear in the top lists it is worth looking in mode detail at the following:
+
+* Qualification predictors
+* Industry predictors
+* Household status predictors
+* Marital status predictors
+* Religion predictors
+* Ethnicity predictors
+
+### Qualification deep dive
+
+Looking at all the qualification features, and mapping against the y values.  Here only the Level4 and no qualification have values about 0.25, which is why they appear in the models.  In addition, all are negatively correlated apart from Level 4, with level 1 and no qualification clearly negative.
+
+```{r graph of qualification features vs y soa}
+# qualification features SOA
+load('rda/qualifications.rda')
+qualifications_features <- names(qualifications) %>% str_subset("25_64")
+train_soa_final %>%  select(y, all_of(qualifications_features)) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for qualification features in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of qualification type")
+```
+
+
+```{r graph of qualification features vs y msoa}
+# qualification features MSOA
+train_set_final %>%  select(y, all_of(qualifications_features)) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for qualification features in MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of qualification type")
+```
+
+Looking more closely at the level 4 qualifications for MSOA and SOA areas with the proportion of white UK people.  In both cases it looks pretty linear, which is the main driver of the linear model strengths.  Visually, it looks like the areas with a high white proportion tend to be closely correlated and the others areas less so.
+
+```{r plot of level4 against y}
+#Plot of y vs level 4 with colour as proportion of white uk
+# initial prep of the SOA data, retaining only the relevant columns
+train_soa_final_excerpt <- train_soa_final %>%  
+  select(y, level4_25_64, white_uk_25_64) %>%
+  rename(SOA = y) %>%
+  # pivot longer with the lavel soa
+  pivot_longer(cols = SOA,
+               names_to = "area_type", 
+               values_to = "y")
+train_set_final %>%
+  select(y, level4_25_64, white_uk_25_64) %>%
+  rename(MSOA = y) %>%
+  # pivot longer with the label MSOA
+  pivot_longer(cols = MSOA,
+               names_to = "area_type", 
+               values_to = "y") %>%
+  # adding the SOA data
+  rbind(train_soa_final_excerpt) %>%
+  ggplot(aes(y, level4_25_64, col=white_uk_25_64))  + 
+  facet_grid(.~area_type) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for level4 features") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of level4 qualifications")
+```
+
+This can be illustrated further with stratification of the level4 vs y by white uk, where you can see that for lower proportions of white UK, the link with education is less important.  I have only used SOA data here as there is more detail and variation.
+
+```{r stratification by white uk proportion}
+# looking at stratification for the white uk, soa
+train_soa_final %>%  
+  select(y, level4_25_64, white_uk_25_64) %>%
+  # round to nearest 0.1
+  mutate(white_uk_strata = round(white_uk_25_64, 1)) %>%
+  ggplot(aes(y, level4_25_64, col=white_uk_25_64))  + 
+  facet_wrap(.~white_uk_strata) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for level4 features, stratified by 'white UK' in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of level4 qualifications")
+```
+
+And here is the correlation values, which also illustrate that below 60% the link between qualification and professional and managerial occupations is weaker.
+
+```{correlation between qualification and y stratified}
+# stratification and correlation
+train_soa_final %>%  
+  select(y, level4_25_64, white_uk_25_64) %>%
+  # round to nearest 0.1
+  mutate(white_uk_strata = round(white_uk_25_64, 1)) %>%
+  group_by(white_uk_strata) %>%
+  dplyr::summarize(correlation = cor(y, level4_25_64)) %>%
+  knitr::kable()
+```
+
+
+### Industry predictors
+
+Looking at the industry predictors in the same way to the qualifications.  Here most of the features have flatish results, apart from Industry KLMN, positive, and Manufacturing, construction and GI, negative.  Also, OPQ is the only industry along with KLMN which has high proportions in areas with high proportion of senior roles, even though overall it is flat.
+
+The key industries are:
+
+* Industry KLMN
+ + Industry K - Financial and insurance activities
+ + Industry L - Real estate activities
+ + Industry M - Professional, scientific and technical activities
+ + Industry N - Administrative and support service activities
+* Industry GI
+ + Industry G - Wholesale and retail trade; repair of motor vehicles and motor cycles
+ + Industry I - Accommodation and food service activities
+* Industry OPQ
+ + Industry O - Public administration and defence; compulsory social security
+ + Industry P - Education
+ + Industry Q - Human health and social work activities
+
+```{r graph of industry features vs y soa}
+#industry features SOA
+load('rda/industry.rda')
+industry_features <- names(industry) %>% str_subset("25_64")
+train_soa_final %>%  select(y, all_of(industry_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for industry features in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of industry type")
+```
+
+```{r graph of industry features vs y msoa}
+#industry features MSOA
+train_set_final %>%  select(y, all_of(industry_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for industry features in MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of industry type")
+```
+
+
+### Household status predictors
+
+In the household features, loneparent has a clear negative correlation, although it does not come out as an important feature, perhaps it is closely related to another feature.  Married family appears on the list, but has an only slight positive gradient.
+
+```{graph of household features vs y for soa}
+# household features soa
+load('rda/household.rda')
+household_features <- names(household) %>% str_subset("25_64")
+train_soa_final %>%  select(y, all_of(household_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for household features in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of household type")
+```
+
+```{graph of household features vs y for soa}
+# household features msoa
+load("rda/train_set_final.rda")
+train_set_final %>%  select(y, all_of(household_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for household features in MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of household type")
+```
+
+
+### Marital status predictors
+
+For Marital predictors, most of the predictors have quite low values, apart from married and single which have a large spread, with married positively correlated.  Divorced is also clearly negative.
+
+```{r graph of marital status vs y soa}
+#marital features soa
+load('rda/marital.rda')
+marital_features <- names(marital) %>% str_subset("25_64")
+train_soa_final %>%  select(y, all_of(marital_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for marital features with SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of marital type")
+```
+
+```{r graph of marital status vs y msoa}
+#marital features msoa
+load("rda/train_set_final.rda")
+train_set_final %>%  select(y, all_of(marital_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for marital features with MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of marital type")
+```
+
 
 ## Importance without qualification
 
-## Correlation of features
+I am interested in feature importance, and as qualifications are so importance, I will try without the qualification to see what remains.  I will focus on the GLM model as it was high performing and fast, with importance.
+
+Starting with the MSOA data, removing the qualification features, the RMSE is 0.0314370 for GLM, vs 0.0166809 with the full data, significantly worse, and not so far from the baseline of the mean of 0.0965.
+
+```{r prediction without qualification data}
+## msoa data
+# removing the qualification data
+# get the names of the features
+load('rda/qualifications.rda')
+load("rda/test_set_final.rda")
+load("rda/rmse_results.rda")
+qualifications_features <- names(qualifications) %>% str_subset("25_64")
+train_msoa_noqual <- train_set_final %>% select(-all_of(qualifications_features))
+# train with the no qualification data set
+result_glm_train_msoa_noqual <- 
+  results_train_method(train_msoa_noqual, test_set_final, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_msoa_noqual$results, 1))
+rmse_results %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_glm_train_msoa_noqual$train, scale=FALSE)
+plot(importance, 20)
+```
+
+Of the features, Loneparent is important, as is construction and age.  Ethnicities do not see so important, other than white irish.
+
+
+## Ethnicity deep dive
+
+Part of the original motivation for this project was the reported lack of opportunities for certain ethnic groups.
+
+Interestingly, in the earlier analysis, led by the models and the raw data, ethnicities do not generally come out as significant factors, apart from positive correlation with white Irish and white other.
+
+In this section I will look specifically at ethnic features and see if there is anything there, similarly to the reports.
+
+Looking at the plots between the ethnicities and Y, proportion of managerial and professional roles, it can be seen that the fit lines are fairly flat apart from white other (positive), but there are lots of graphs which show a triangle shape with low proportions of senior roles in areas with high concentrations of that ethnicity, particularly Black african, Black other, Bangladeshi and Pakistani.  These are the communities often highlighted in the press as having poor outcomes, backed up by the data here.
+
+```{graph of ethnicity vs y for soa}
+#ethnicity features soa
+load('rda/ethnicity.rda')
+ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
+train_soa_final %>% 
+  #select only the ethnicity features
+  select(y, all_of(ethnicity_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  # str_replace_all(., "_25_64", "") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for ethnicity features in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of ethnicity type")
+```
+
+```{graph of ethnicity vs y for msoa}
+#ethnicity features msoa
+load("rda/train_set_final.rda")
+train_set_final %>%  
+  #select only the ethnicity features
+  select(y, all_of(ethnicity_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for ethnicity features in MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of ethnicity type")
+```
+
+Looking at the correlations, and the p values, this matches the images, with white other, white Irish, Chinese and other positive, and Black African, Pakistani negative.  The p-value for all for the SOA data is 0, indicating that there probability of these results given no relationship is low - there is an effect.  For the MSOA, the p value is non-zero for Indian, black other and Bangladeshi, indicating a weaker effect, especially for Indian.
+
+```{r correlation and p value for ethnicity and y soa}
+# correlation with p value
+
+# uses the Hmisc package
+if (!require('Hmisc')) install.packages('Hmisc'); library('Hmisc')
+# extract the ethnicity features for SOA
+# calculate the correlation matrix and p value matrix
+train_soa_rcorr <- rcorr(as.matrix(train_soa_final))
+# extract the p-value result for y
+train_soa_ethnicity_p <- 
+  data.frame(train_soa_rcorr$P) %>%
+  # select the y column
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("p_value" = "y")
+# extract correlation, and display with p-value result
+data.frame(train_soa_rcorr$r) %>%
+  # select the y column
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("y_correlation_coefficient" = "y") %>%
+  #include the p_value
+  left_join(train_soa_ethnicity_p) %>%
+  # reorder and display
+  arrange(desc(abs(y_correlation_coefficient))) %>%
+  knitr::kable()
+```
+
+```{r correlation and p value for ethnicity and y msoa}
+# extract the ethnicity features for MSOA
+# calculate the correlation matrix and p valuer matrix
+train_msoa_rcorr <- rcorr(as.matrix(train_set_final))
+# extract the p-value result for y
+train_msoa_ethnicity_p <- 
+  data.frame(train_msoa_rcorr$P) %>%
+  # select the y column
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("p_value" = "y")
+# extract correlation, and display with p-value result
+data.frame(train_msoa_rcorr$r) %>%
+  # select the y column
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("y_correlation_coefficient" = "y") %>%
+  #include the p_value
+  left_join(train_msoa_ethnicity_p) %>%
+  # reorder and display
+  arrange(desc(abs(y_correlation_coefficient))) %>%
+  knitr::kable()
+```
+
+Next, carrying out a similar analysis against the level4 qualifications.  Here, as expected the results are similar to the more senior managerial and professional occupations, with white other, white Irish and Chinese positive, and white UK and Pakistani negative.
+
+```{r plots of ethnicity vs level4 qualifications for soa}
+#ethnicity features vs level4 soa
+load('rda/ethnicity.rda')
+ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
+train_soa_final %>% 
+  #select only the ethnicity features
+  select(level4_25_64, all_of(ethnicity_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # rename(str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -level4,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  # str_replace_all(., "_25_64", "") %>%
+  ggplot(aes(level4, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Level4 qualifications for ethnicity features in SOA") +
+  xlab("level4, proportion of degree or equivalent") +
+  ylab("proportion of ethnicity type")
+#ethnicity features msoa
+load("rda/train_set_final.rda")
+train_set_final %>%  
+  #select only the ethnicity features
+  select(level4_25_64, all_of(ethnicity_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -level4,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(level4, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Level4 qualifications for ethnicity features in MSOA") +
+  xlab("level4, proportion of degree or equivalent") +
+  ylab("proportion of ethnicity type")
+```
+
+However, there are differences, with Black African and Black Other significantly worse for their achievements in senior occupations than their educational achievements, this is more clear looking at the values, with correlation between areas with more Black African residents and Level4 qualification as -0.089220, vs -0.197096 for the senior occupations for SOA; for Black other residents, the level4 qualification has a correlation of -0.013246, whereas the occupation has a correlation of -0.109491 for SOA, with similar results in the MSOA, with a roughly -0.1 between the qualification and occupation.
+
+```{r table of correlation qualification and ethnicity in soa}
+# extract the ethnicity features for SOA
+# extract the p-value result for level4
+train_soa_level4_p <- 
+  data.frame(train_soa_rcorr$P) %>%
+  # select the level4 columns
+  select(level4_25_64) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("p_value" = "level4_25_64")
+# extract correlation, and display with p-value result
+data.frame(train_soa_rcorr$r) %>%
+  # select the level4 columns
+  select(level4_25_64) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("level4_correlation_coefficient" = "level4_25_64") %>%
+  #include the p_value
+  left_join(train_soa_level4_p) %>%
+  # reorder and display
+  arrange(desc(abs(level4_correlation_coefficient))) %>%
+  knitr::kable()
+```
+
+```{r table of correlation qualification and ethnicity in msoa}
+# extract the ethnicity features for MSOA
+# extract the p-value result for level4
+train_msoa_level4_p <- 
+  data.frame(train_msoa_rcorr$P) %>%
+  # select the level4 columns
+  select(level4_25_64) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("p_value" = "level4_25_64")
+# extract correlation, and display with p-value result
+data.frame(train_msoa_rcorr$r) %>%
+  # select the level4 columns
+  select(level4_25_64) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("level4_correlation_coefficient" = "level4_25_64") %>%
+  #include the p_value
+  left_join(train_msoa_level4_p) %>%
+  # reorder and display
+  arrange(desc(abs(level4_correlation_coefficient))) %>%
+  knitr::kable()
+```
+
+I can stratify the data to see how the relationship between qualifications and senior occupations varies with the proportion of black african and black other residents.  I limited to stratas with at least 50 samples, and you can see that the relation between occupation and qualification weakens with more Black African residents.
+
+```{r y vs level4 stratified by black african}
+# looking at stratification for the black african, soa
+train_soa_final %>%
+  # select columns
+  select(y, level4_25_64, black_african_25_64) %>%
+  # round to nearest 0.5
+  mutate(black_african_strata = (round(2*black_african_25_64, 1))/2) %>%
+  # filter to those strata with more than 50 samples
+  filter(black_african_strata <= 0.4) %>%
+  ggplot(aes(y, level4_25_64, col=black_african_25_64))  + 
+  facet_wrap(.~black_african_strata) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for level4 features, stratified by 'Black African' in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of level4 qualifications")
+```
+
+The results with Black other show a similar trend.
+
+```{r y vs level4 stratified by black other}
+# looking at stratification for the black other, soa
+train_soa_final %>%
+  # select columns
+  select(y, level4_25_64, black_other_25_64) %>%
+  # round to nearest 0.5
+  mutate(black_other_strata = (round(2*black_other_25_64, 1))/2) %>%
+  # filter to those strata with more than 50 samples
+  filter(black_other_strata <= 0.3) %>%
+  ggplot(aes(y, level4_25_64, col=black_other_25_64))  + 
+  facet_wrap(.~black_other_strata) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for level4 features, stratified by 'Black other' in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of level4 qualifications")
+```
+
+Putting together a graph of all the ethnicities and their correlations, it is a confused picture, in part as the data does not have sufficient samples of areas for each strata, and also as the results are for areas with different proportions of each ethinicity, so we are unable to pick out the achievement of the residents of each ethinicity separately.
+
+However, the overall correlation between level4 qualifications and the managerial and professional roles is 0.905, and this is only achieved in areas with white uk, white other, Asian other, and maybe Indian.  It is clear that when there are more non-white ethnicities, the correlation between qualification and role drops off, perhaps indicating that even with similar high achievement in qualifications it is harder for non-white ethnicities to obtain the best roles.
+
+```{r graph }
+# graphing the correlation for each ethnicity
+# create a list of a correlation table for each ethnicity
+eth_corr_list <- lapply(ethnicity_features, function(ethnicity){
+  print(paste("working with", ethnicity, "feature"))
+  tmp <- train_soa_final %>% 
+    # round to nearest 0.5
+    mutate(strata = round(.data[[ethnicity]], 1)) %>%
+    # filter to those strata with more than 50 samples
+    filter(strata <= 1) %>%
+    # group the data by strata
+    group_by(strata) %>%
+    dplyr::summarise(correlation = cor(y, level4_25_64))
+  colnames(tmp) <- c("strata", ethnicity)
+  tmp
+})
+
+# create starter data frame
+eth_corr <- data.frame(eth_corr_list[1])
+# loop around and add each table to the data frame
+for(i in 2:length(eth_corr_list)) {
+  eth_corr <- 
+    eth_corr %>%
+    left_join(data.frame(eth_corr_list[i]))
+}
+# graph the proportions
+eth_corr %>%
+  pivot_longer(cols = -strata, 
+             names_to = "ethnicity", 
+             values_to = "correlation") %>%
+  filter(correlation >= 0.4) %>%
+  ggplot(aes(strata, correlation, col=ethnicity))  + 
+  geom_line() +
+  ggtitle("Correlation between y and level4 qualification for ethinicity groups in SOA") +
+  xlab("proportion of residents with ethnicity") +
+  ylab("correlation between senior occupations and level4 qualifications")
+```
+
+
+Lastly I will look at the overall outcomes in England and Wales (the detail is not available for the UK) for senior managerial and professional occupations and level 4 qualifications, with their ratio by ethnicities.
+
+There are two tables with the necessary data:
+
+* load in the Highest level of qualification by ethnic group by age
+ + https://www.nomisweb.co.uk/census/2011/dc5202ew
+* load in the Occupation by ethnic group by sex by age data
+ + https://www.nomisweb.co.uk/census/2011/dc6213ew
+
+Unfortunately one of them only has summarised data, which I will use.  This has a single figure for Asian, so masking the differences between Indian/Chinese, and Pakistani/Bangladeshi achievements.
+
+The graph shows that the only group whose qualifications are below average are white UK residents.  However, in terms of senior occupations Black, mixed and other do worse than would be expected.  This is exacerbated by the fact that their qualifications are high compared to the normal, and therefore given that qualification is the most important factor (or machine learning feature) then this is doubly poor achievement in terms of occupations.
+
+White Irish are also striking in terms of the qualifications and the seniority of their occupations.
+
+As mentioned, the Asian group includes high performing Chinese and Indian groups, as well as poorly achieving Pakistani and Bangladeshi, and I suspect that the two groups would diverge in terms of both qualifications and occupations.
+
+```{r download data from nomis on ethnicity and qualification, eval=FALSE}
+# look at ratios of ethnicity and occupation and qualification in countries in the UK
+## download the data
+#  <option value="TYPE499">countries</option>
+# load in the Highest level of qualification by ethnic group by age
+# https://www.nomisweb.co.uk/census/2011/dc5202ew
+# load in the Occupation by ethnic group by sex by age data
+# https://www.nomisweb.co.uk/census/2011/dc6213ew
+censusdata_list <- c("dc5202ew", "dc6213ew")
+# run the function to download the csv files
+download_censusdata("TYPE499", censusdata_list)
+
+# load in the Highest level of qualification by ethnic group by age
+# https://www.nomisweb.co.uk/census/2011/dc5202ew
+geographytype <- "TYPE499"
+data <- ingest("dc5202ew", geographytype)
+str(data)
+# put together a table with the level4 qualifications by ethnicity
+ethnicity_level4_25_64_raw <- data %>%
+  #keeping only the data relating to age 25 to 64
+  select(contains("geography") | 
+           contains("Age 25 to 34") |
+           contains("Age 35 to 49") | 
+           contains("Age 50 to 64") ) %>%
+  #keeping only the data relating to Highest Level of Qualification: Level 4 qualifications 
+  select(contains("geography") | contains("Highest Level of Qualification: Level 4 qualifications") ) %>%
+  # adding up the year groups
+  rowwise() %>%
+  mutate("all_25_64" = 
+           sum(across(contains("Ethnic Group: All categories"))) ) %>%
+  mutate("white_uk_25_64" = 
+           sum(across(contains("Ethnic Group: White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
+    mutate("white_irish_25_64" = 
+             sum(across(contains("Ethnic Group: White: Irish"))) ) %>%
+    mutate("white_other_25_64" = 
+           sum(across(contains("Ethnic Group: White: Other White"))) ) %>%
+    mutate("mixed_25_64" = 
+             sum(across(contains("Ethnic Group: Mixed/multiple ethnic group"))) ) %>%
+    mutate("asian_25_64" = 
+           sum(across(contains("Ethnic Group: Asian/Asian British"))) ) %>%
+    mutate("black_25_64" = 
+             sum(across(contains("Ethnic Group: Black/African/Caribbean/Black British"))) ) %>%
+    mutate("other_25_64" = 
+           sum(across(contains("Ethnic Group: Other ethnic group"))) ) %>%
+  rename("geo_name" = "geography") %>%
+  select(contains("geo_name") | contains("25_64")) %>%
+  filter(geo_name == "England and Wales")
+
+# put together a table with all the 25 to 64 residents with the same data
+ethnicity_all_25_64_raw <- data %>%
+  #keeping only the data relating to age 25 to 64
+  select(contains("geography") | 
+           contains("Age 25 to 34") |
+           contains("Age 35 to 49") | 
+           contains("Age 50 to 64") ) %>%
+  #keeping only the data relating to Highest Level of Qualification: All, to give all residents 25 to 64 by ethinicity 
+  select(contains("geography") | 
+           contains("Highest Level of Qualification: All categories:") ) %>%
+  # adding up the year groups
+  rowwise() %>%
+  mutate("all_25_64" = 
+           sum(across(contains("Ethnic Group: All categories"))) ) %>%
+  mutate("white_uk_25_64" = 
+           sum(across(contains("Ethnic Group: White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
+  mutate("white_irish_25_64" = 
+           sum(across(contains("Ethnic Group: White: Irish"))) ) %>%
+  mutate("white_other_25_64" = 
+           sum(across(contains("Ethnic Group: White: Other White"))) ) %>%
+  mutate("mixed_25_64" = 
+           sum(across(contains("Ethnic Group: Mixed/multiple ethnic group"))) ) %>%
+  mutate("asian_25_64" = 
+           sum(across(contains("Ethnic Group: Asian/Asian British"))) ) %>%
+  mutate("black_25_64" = 
+           sum(across(contains("Ethnic Group: Black/African/Caribbean/Black British"))) ) %>%
+  mutate("other_25_64" = 
+           sum(across(contains("Ethnic Group: Other ethnic group"))) ) %>%
+  rename("geo_name" = "geography") %>%
+  select(contains("geo_name") | contains("25_64")) %>%
+  filter(geo_name == "England and Wales")
+
+# load in the Occupation by ethnic group by sex by age data
+# https://www.nomisweb.co.uk/census/2011/dc6213ew
+geographytype <- "TYPE499"
+data <- ingest("dc6213ew", geographytype)
+str(data) %>% head(50)
+
+# put together a table with the level4 qualifications by ethnicity
+ethnicity_y_25_64_raw <- data %>%
+  #keeping only the data relating to all (not by gender)
+  select(contains("geography") | 
+           contains("Sex: All persons") ) %>%
+  #keeping only the data relating to age 25 to 64
+  select(contains("geography") | 
+           contains("Age 25 to 49") | 
+           contains("Age 50 to 64") ) %>%
+  #keeping only the data relating to Highest Level of Qualification: All, to give all residents 25 to 64 by ethinicity 
+  select(contains("geography") | 
+           contains("Occupation: 1. Managers") |
+           contains("Occupation: 2. Professional") ) %>%
+  # adding up the year groups
+  rowwise() %>%
+  mutate("all_25_64" = 
+           sum(across(contains("Ethnic Group: All categories"))) ) %>%
+  mutate("white_uk_25_64" = 
+           sum(across(contains("Ethnic Group: White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
+  mutate("white_irish_25_64" = 
+           sum(across(contains("Ethnic Group: White: Irish"))) ) %>%
+  mutate("white_other_25_64" = 
+           sum(across(contains("Ethnic Group: White: Other White"))) +
+           sum(across(contains("Ethnic Group: White: Gypsy or Irish Traveller"))) ) %>%
+  mutate("mixed_25_64" = 
+           sum(across(contains("Ethnic Group: Mixed/multiple ethnic group: Total"))) ) %>%
+  mutate("asian_25_64" = 
+           sum(across(contains("Ethnic Group: Asian/Asian British: Total"))) ) %>%
+  mutate("black_25_64" = 
+           sum(across(contains("Ethnic Group: Black/African/Caribbean/Black British: Total"))) ) %>%
+  mutate("other_25_64" = 
+           sum(across(contains("Ethnic Group: Other ethnic group: Total"))) ) %>%
+  rename("geo_name" = "geography") %>%
+  select(contains("geo_name") | contains("25_64")) %>%
+  filter(geo_name == "England and Wales")
+
+# join together
+# pivot to long form
+ethnicity_y_25_64_Long <- ethnicity_y_25_64_raw %>%
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  pivot_longer(cols = -geo_name,
+               names_to = "ethnicity",
+               values_to = "occupation_25_64")
+ethnicity_level4_25_64_long <- ethnicity_level4_25_64_raw %>%
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  pivot_longer(cols = -geo_name,
+               names_to = "ethnicity",
+               values_to = "qualification_25_64")
+# join in to a single table
+ethnicity_level4_25_64_long
+ethnicity_25_64_raw <- ethnicity_all_25_64_raw %>%
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  pivot_longer(cols = -geo_name,
+               names_to = "ethnicity",
+               values_to = "all_25_64") %>%
+  left_join(ethnicity_y_25_64_Long) %>%
+  left_join(ethnicity_level4_25_64_long)
+
+# tidy
+save(ethnicity_25_64_raw, file="rda/ethnicity_25_64_raw.rda")
+```
+
+```{r graph showing proportions per ethnicity}
+# graph
+load("rda/ethnicity_25_64_raw.rda")
+# calculate the ratio of the working population for each ethnicity
+ethnicity_25_64 <- ethnicity_25_64_raw %>%
+  mutate(senior_occupation = occupation_25_64 / all_25_64) %>%
+  mutate(level4_qualification  = qualification_25_64 / all_25_64) %>%
+  select(ethnicity, senior_occupation, level4_qualification)
+# put together a list in order based on the senior_occupation value
+ethnicity_graph_order <- ethnicity_25_64 %>%
+  arrange(senior_occupation) %>% .$ethnicity
+ethnicity_25_64
+# plot the graph
+ethnicity_25_64 %>% 
+  # pivot longer to include the proportions in one columns
+  pivot_longer(cols = -ethnicity,
+               names_to = "ratios",
+               values_to = "population_proportion") %>%
+  ggplot(aes(ethnicity, population_proportion, fill=ratios)) +
+  geom_bar(stat="identity", position="dodge") +
+  geom_hline(aes(yintercept=ethnicity_25_64$senior_occupation[1])) +
+  geom_text(aes(4.5, ethnicity_25_64$senior_occupation[1],
+             label="senior occupation for all residents 25 to 64"), 
+            nudge_y=0.015, size = 3.5) + 
+  geom_hline(yintercept=ethnicity_25_64$level4_qualification[1]) +
+  geom_text(aes(4.5, ethnicity_25_64$level4_qualification[1],
+                label="level4 qualification for all residents 25 to 64"), 
+            nudge_y=0.015, size = 3.5) + 
+# using the list earlier for the order on the x axis
+  scale_x_discrete(limits=ethnicity_graph_order) +
+  theme(legend.position = "bottom") +
+  theme(axis.text.x = element_text(angle = 45, vjust=1, hjust=1)) +
+  ggtitle("Proportions of 25 to 64 year olds in England and Wales") +
+  xlab("Ethnic groups") +
+  ylab("Proportion of each ethnic group")
+```
+
 
 # Results
 <!-- a results section that presents the modeling results and discusses the model performance  -->
@@ -3632,6 +4480,7 @@ The "high correlation" function in caret did not work well at helping feature se
 By far and away the most important element for high quality occupation is qualifications.  As this is by area, it is not clear on cause and effect, that is, the highly qualified people all move to where the best jobs are, or that the best jobs are where there are highly qualified people, but the public policy implications are clear, ensuring all groups have access to education and qualifications is critical to ensure no one is left behind.
 
 
+note the poor achievements for white uk, both in occupations and qualifications.  and that the best is for white other and Irish, which will be primarily EU migrants.  Think about this as drivers for populism and brexit, the underlying causes.
 
 
 ## Further work
@@ -3647,7 +4496,7 @@ Similarly, for the number of features per model, this could be carried out in a 
 
 ### Societal implications
 
-This study was to focus on machine learning, but it would be interesting to extend the work to look at the correlation between the different factors.  For example, "Jewish" ethnicities are positively correlated and "Pakistini" and "Bangladeshi" are negatively, and this could be due to education and qualifications (the press mentions the poor school outcomes for some ethinicities), and it would be interesting to investigate which are convoluted and which are causal in terms of drivers.
+This study was to focus on machine learning, but it would be interesting to extend the work to look at the correlation between the different factors.  For example, "White other" is positively correlated and "Pakistini" and "Bangladeshi" are negatively, and this could be due to education and qualifications (the press mentions the poor school outcomes for some ethinicities), and it would be interesting to investigate which are convoluted and which are causal in terms of drivers.
 
 
 

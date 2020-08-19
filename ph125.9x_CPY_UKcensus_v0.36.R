@@ -2634,6 +2634,8 @@ feature_rank %>% select(feature, mean_rank, mean_overall) %>%
   arrange(desc(mean_overall)) %>% head(15) %>% knitr::kable()
 
 # plotting the top 9
+load("rda/feature_rank.rda")
+load("rda/train_set_final.rda")
 feature_top9 <- feature_rank %>% 
   select(feature, mean_rank, mean_overall) %>%
   arrange(desc(mean_overall)) %>% head(9) %>%
@@ -2645,14 +2647,12 @@ train_set_final %>%
                names_to = "feature", 
                values_to = "value") %>%
   filter(feature %in% feature_top9) %>% 
-  #tidy the name to make more readable
-  rename_at(vars(ends_with("25_64")), ~str_replace_all(., "_25_64", "")) %>%
   ggplot(aes(y, value, col=feature))  + 
   geom_point() +
   facet_wrap(. ~feature,  scales = "free_y") +
-  ggtitle("Outcome y for important features")
-xlab("y, proportion of managerial & professional")
-ylab("feature values")
+  ggtitle("Outcome y for important features") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("feature values")
 
 #looking at correlation with y
 data.frame(cor(train_set_final)) %>%
@@ -3557,7 +3557,7 @@ rmse_results_soa %>% knitr::kable()
 save(rmse_results_soa, file="rda/rmse_results_soa.rda")
 save(result_svmradial_train_soa_15k_top28, 
      file="rda/result_svmradial_train_soa_15k_top28.rda")
-rm(result_svmradial_train_soa_10k_top28)
+rm(result_svmradial_train_soa_15k_top28)
 rm(index)
 
 
@@ -3597,6 +3597,7 @@ rmse_results_soa %>% knitr::kable()
 save(rmse_results_soa, file="rda/rmse_results_soa.rda")
 save(result_gam_train_soa_10k_top28, 
      file="rda/result_gam_train_soa_10k_top28.rda")
+rm(result_gam_train_soa_10k_top28)
 
 # with the 15k top28 SOA training set
 result_gam_train_soa_15k_top28 <- 
@@ -3692,26 +3693,693 @@ rm(tmp)
 
 #### feature importance ####
 
+# plotting the top 9 for SOA
+load("rda/feature_rank_soa.rda")
+feature_rank_soa <- feature_rank
+feature_top9_soa <- feature_rank_soa %>% 
+  select(feature, mean_rank, mean_overall) %>%
+  arrange(desc(mean_overall)) %>% head(9) %>%
+  pull(feature)
+# feature_top9_soa
+# feature_rank_soa
+#create the plot
+train_soa_final %>%  
+  #pivot to a long version with a row per feature/value
+  pivot_longer(cols = !"y", 
+               names_to = "feature", 
+               values_to = "value") %>%
+  filter(feature %in% feature_top9_soa) %>% 
+  ggplot(aes(y, value, col=feature))  + 
+  geom_point(size=0.5) +
+  facet_wrap(. ~feature,  scales = "free_y") +
+  ggtitle("Outcome y for important features for SOA areas") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("feature values")
 
+#looking at correlation with y
+data.frame(cor(train_soa_final)) %>%
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  filter(feature %in% feature_top9_soa) %>% 
+  arrange(desc(abs(y))) %>%
+  knitr::kable()
+
+# tidy
+rm(feature_rank, feature_rank_soa)
+
+## qualification and level 4 deep dive
+# qualification features SOA
+load('rda/qualifications.rda')
+qualifications_features <- names(qualifications) %>% str_subset("25_64")
+train_soa_final %>%  select(y, all_of(qualifications_features)) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for qualification features in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of qualification type")
+# qualification features MSOA
+train_set_final %>%  select(y, all_of(qualifications_features)) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for qualification features in MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of qualification type")
+
+#Plot of y vs level 4 with colour as proportion of white uk
+# initial prep of the SOA data, retaining only the relevant columns
+train_soa_final_excerpt <- train_soa_final %>%  
+  select(y, level4_25_64, white_uk_25_64) %>%
+  rename(SOA = y) %>%
+  # pivot longer with the lavel soa
+  pivot_longer(cols = SOA,
+               names_to = "area_type", 
+               values_to = "y")
+train_set_final %>%
+  select(y, level4_25_64, white_uk_25_64) %>%
+  rename(MSOA = y) %>%
+  # pivot longer with the label MSOA
+  pivot_longer(cols = MSOA,
+               names_to = "area_type", 
+               values_to = "y") %>%
+  # adding the SOA data
+  rbind(train_soa_final_excerpt) %>%
+  ggplot(aes(y, level4_25_64, col=white_uk_25_64))  + 
+  facet_grid(.~area_type) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for level4 features") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of level4 qualifications")
+
+# looking at stratification for the white uk, soa
+train_soa_final %>%  
+  select(y, level4_25_64, white_uk_25_64) %>%
+  # round to nearest 0.1
+  mutate(white_uk_strata = round(white_uk_25_64, 1)) %>%
+  ggplot(aes(y, level4_25_64, col=white_uk_25_64))  + 
+  facet_wrap(.~white_uk_strata) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for level4 features, stratified by 'white UK' in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of level4 qualifications")
+
+# stratification and correlation
+train_soa_final %>%  
+  select(y, level4_25_64, white_uk_25_64) %>%
+  # round to nearest 0.1
+  mutate(white_uk_strata = round(white_uk_25_64, 1)) %>%
+  group_by(white_uk_strata) %>%
+  dplyr::summarize(correlation = cor(y, level4_25_64)) %>%
+  knitr::kable()
+
+#industry features SOA
+load('rda/industry.rda')
+industry_features <- names(industry) %>% str_subset("25_64")
+train_soa_final %>%  select(y, all_of(industry_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for industry features in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of industry type")
+#industry features MSOA
+train_set_final %>%  select(y, all_of(industry_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for industry features in MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of industry type")
+
+# household features soa
+load('rda/household.rda')
+household_features <- names(household) %>% str_subset("25_64")
+train_soa_final %>%  select(y, all_of(household_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for household features in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of household type")
+# household features msoa
+load("rda/train_set_final.rda")
+train_set_final %>%  select(y, all_of(household_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for household features in MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of household type")
+
+#marital features soa
+load('rda/marital.rda')
+marital_features <- names(marital) %>% str_subset("25_64")
+train_soa_final %>%  select(y, all_of(marital_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for marital features in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of marital type")
+#marital features msoa
+load("rda/train_set_final.rda")
+train_set_final %>%  select(y, all_of(marital_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for marital features in MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of marital type")
+# tidy up
+rm(marital, industry, household)
+rm(marital_features, industry_features, household_features)
 
 
 #### running without the qualification features ####
+## msoa data
+# removing the qualification data
+# get the names of the features
+load('rda/qualifications.rda')
+load("rda/test_set_final.rda")
+load("rda/rmse_results.rda")
+qualifications_features <- names(qualifications) %>% str_subset("25_64")
+train_msoa_noqual <- train_set_final %>% select(-all_of(qualifications_features))
+# train with the no qualification data set
+result_glm_train_msoa_noqual <- 
+  results_train_method(train_msoa_noqual, test_set_final, "glm")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_glm_train_msoa_noqual$results, 1))
+rmse_results %>% knitr::kable()
+#checking the variable importance
+importance <- varImp(result_glm_train_msoa_noqual$train, scale=FALSE)
+plot(importance, 20)
+importance$importance
+
+# tidy up
+save(result_glm_train_msoa_noqual, file="rda/result_glm_train_msoa_noqual.rda")
+save(rmse_results, file="rda/rmse_results.rda")
+rm(qualifications, qualifications_features)
+rm(train_msoa_noqual, result_glm_train_msoa_noqual)
+
+#### ethnicity deep dive ####
+
+#ethnicity features vs y soa
+load('rda/ethnicity.rda')
+ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
+train_soa_final %>% 
+  #select only the ethnicity features
+  select(y, all_of(ethnicity_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # rename(str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  # str_replace_all(., "_25_64", "") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for ethnicity features in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of ethnicity type")
+#ethnicity features msoa
+load("rda/train_set_final.rda")
+train_set_final %>%  
+  #select only the ethnicity features
+  select(y, all_of(ethnicity_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -y,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(y, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for ethnicity features in MSOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of ethnicity type")
+
+# correlation with p value
+# uses the Hmisc package
+if (!require('Hmisc')) install.packages('Hmisc'); library('Hmisc')
+# extract the ethnicity features for SOA
+# calculate the correlation matrix and p value matrix
+train_soa_rcorr <- rcorr(as.matrix(train_soa_final))
+# extract the p-value result for y
+train_soa_ethnicity_p <- 
+  data.frame(train_soa_rcorr$P) %>%
+  # select the y column
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("p_value" = "y")
+# extract correlation, and display with p-value result
+data.frame(train_soa_rcorr$r) %>%
+  # select the y column
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("y_correlation_coefficient" = "y") %>%
+  #include the p_value
+  left_join(train_soa_ethnicity_p) %>%
+  # reorder and display
+  arrange(desc(abs(y_correlation_coefficient))) %>%
+  knitr::kable()
+
+# extract the ethnicity features for MSOA
+# calculate the correlation matrix and p valuer matrix
+train_msoa_rcorr <- rcorr(as.matrix(train_set_final))
+# extract the p-value result for y
+train_msoa_ethnicity_p <- 
+  data.frame(train_msoa_rcorr$P) %>%
+  # select the y column
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("p_value" = "y")
+# extract correlation, and display with p-value result
+data.frame(train_msoa_rcorr$r) %>%
+  # select the y column
+  select(y) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("y_correlation_coefficient" = "y") %>%
+  #include the p_value
+  left_join(train_msoa_ethnicity_p) %>%
+  # reorder and display
+  arrange(desc(abs(y_correlation_coefficient))) %>%
+  knitr::kable()
+
+#ethnicity features vs level4 soa
+load('rda/ethnicity.rda')
+ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
+train_soa_final %>% 
+  #select only the ethnicity features
+  select(level4_25_64, all_of(ethnicity_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # rename(str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -level4,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  # str_replace_all(., "_25_64", "") %>%
+  ggplot(aes(level4, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Level4 qualifications for ethnicity features in SOA") +
+  xlab("level4, proportion of degree or equivalent") +
+  ylab("proportion of ethnicity type")
+#ethnicity features msoa
+load("rda/train_set_final.rda")
+train_set_final %>%  
+  #select only the ethnicity features
+  select(level4_25_64, all_of(ethnicity_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  # pivot longer with the features
+  pivot_longer(cols = -level4,
+               names_to = "feature", 
+               values_to = "proportion") %>%
+  ggplot(aes(level4, proportion))  + 
+  facet_wrap(.~feature, scales = "free_y") +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Level4 qualifications for ethnicity features in MSOA") +
+  xlab("level4, proportion of degree or equivalent") +
+  ylab("proportion of ethnicity type")
+
+# extract the ethnicity features for SOA
+# extract the p-value result for level4
+train_soa_level4_p <- 
+  data.frame(train_soa_rcorr$P) %>%
+  # select the level4 columns
+  select(level4_25_64) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("p_value" = "level4_25_64")
+# extract correlation, and display with p-value result
+data.frame(train_soa_rcorr$r) %>%
+  # select the level4 columns
+  select(level4_25_64) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("level4_correlation_coefficient" = "level4_25_64") %>%
+  #include the p_value
+  left_join(train_soa_level4_p) %>%
+  # reorder and display
+  arrange(desc(abs(level4_correlation_coefficient))) %>%
+  knitr::kable()
+
+# extract the ethnicity features for MSOA
+# extract the p-value result for level4
+train_msoa_level4_p <- 
+  data.frame(train_msoa_rcorr$P) %>%
+  # select the level4 columns
+  select(level4_25_64) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("p_value" = "level4_25_64")
+# extract correlation, and display with p-value result
+data.frame(train_msoa_rcorr$r) %>%
+  # select the level4 columns
+  select(level4_25_64) %>%
+  rownames_to_column(var="feature") %>%
+  # choose only the ethnicity features
+  filter(feature %in% ethnicity_features) %>%
+  rename("level4_correlation_coefficient" = "level4_25_64") %>%
+  #include the p_value
+  left_join(train_msoa_level4_p) %>%
+  # reorder and display
+  arrange(desc(abs(level4_correlation_coefficient))) %>%
+  knitr::kable()
+
+# looking at stratification for the black african, soa
+train_soa_final %>%
+  # select columns
+  select(y, level4_25_64, black_african_25_64) %>%
+  # round to nearest 0.5
+  mutate(black_african_strata = (round(2*black_african_25_64, 1))/2) %>%
+  # filter to those strata with more than 50 samples
+  filter(black_african_strata <= 0.4) %>%
+  ggplot(aes(y, level4_25_64, col=black_african_25_64))  + 
+  facet_wrap(.~black_african_strata) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for level4 features, stratified by 'Black African' in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of level4 qualifications")
+
+# looking at stratification for the black other, soa
+train_soa_final %>%
+  # select columns
+  select(y, level4_25_64, black_other_25_64) %>%
+  # round to nearest 0.5
+  mutate(black_other_strata = (round(2*black_other_25_64, 1))/2) %>%
+  # filter to those strata with more than 50 samples
+  filter(black_other_strata <= 0.3) %>%
+  ggplot(aes(y, level4_25_64, col=black_other_25_64))  + 
+  facet_wrap(.~black_other_strata) +
+  geom_point(size=1) +
+  geom_smooth(method = "lm") +
+  ggtitle("Outcome y for level4 features, stratified by 'Black other' in SOA") +
+  xlab("y, proportion of managerial & professional") +
+  ylab("proportion of level4 qualifications")
+
+# graphing the correlation for each ethnicity
+# create a list of a correlation table for each ethnicity
+eth_corr_list <- lapply(ethnicity_features, function(ethnicity){
+  print(paste("working with", ethnicity, "feature"))
+  tmp <- train_soa_final %>% 
+    # round to nearest 0.5
+    mutate(strata = round(.data[[ethnicity]], 1)) %>%
+    # filter to those strata with more than 50 samples
+    filter(strata <= 1) %>%
+    # group the data by strata
+    group_by(strata) %>%
+    dplyr::summarise(correlation = cor(y, level4_25_64))
+  colnames(tmp) <- c("strata", ethnicity)
+  tmp
+})
+
+# create starter data frame
+eth_corr <- data.frame(eth_corr_list[1])
+# loop around and add each table to the data frame
+for(i in 2:length(eth_corr_list)) {
+  eth_corr <- 
+    eth_corr %>%
+    left_join(data.frame(eth_corr_list[i]))
+}
+# graph the proportions
+eth_corr %>%
+  pivot_longer(cols = -strata, 
+             names_to = "ethnicity", 
+             values_to = "correlation") %>%
+  filter(correlation >= 0.4) %>%
+  ggplot(aes(strata, correlation, col=ethnicity))  + 
+  geom_line() +
+  ggtitle("Correlation between y and level4 qualification for ethinicity groups in SOA") +
+  xlab("proportion of residents with ethnicity") +
+  ylab("correlation between senior occupations and level4 qualifications")
+
+# tidy
+rm(eth_corr_list, eth_corr) 
+rm(tmp)
+
+
+# look at ratios of ethnicity and occupation and qualification in countries in the UK
+## download the data
+#  <option value="TYPE499">countries</option>
+# load in the Highest level of qualification by ethnic group by age
+# https://www.nomisweb.co.uk/census/2011/dc5202ew
+# load in the Occupation by ethnic group by sex by age data
+# https://www.nomisweb.co.uk/census/2011/dc6213ew
+censusdata_list <- c("dc5202ew", "dc6213ew")
+# run the function to download the csv files
+download_censusdata("TYPE499", censusdata_list)
+
+# load in the Highest level of qualification by ethnic group by age
+# https://www.nomisweb.co.uk/census/2011/dc5202ew
+geographytype <- "TYPE499"
+data <- ingest("dc5202ew", geographytype)
+# put together a table with the level4 qualifications by ethnicity
+ethnicity_level4_25_64_raw <- data %>%
+  #keeping only the data relating to age 25 to 64
+  select(contains("geography") | 
+           contains("Age 25 to 34") |
+           contains("Age 35 to 49") | 
+           contains("Age 50 to 64") ) %>%
+  #keeping only the data relating to Highest Level of Qualification: Level 4 qualifications 
+  select(contains("geography") | contains("Highest Level of Qualification: Level 4 qualifications") ) %>%
+  # adding up the year groups
+  rowwise() %>%
+  mutate("all_25_64" = 
+           sum(across(contains("Ethnic Group: All categories"))) ) %>%
+  mutate("white_uk_25_64" = 
+           sum(across(contains("Ethnic Group: White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
+    mutate("white_irish_25_64" = 
+             sum(across(contains("Ethnic Group: White: Irish"))) ) %>%
+    mutate("white_other_25_64" = 
+           sum(across(contains("Ethnic Group: White: Other White"))) ) %>%
+    mutate("mixed_25_64" = 
+             sum(across(contains("Ethnic Group: Mixed/multiple ethnic group"))) ) %>%
+    mutate("asian_25_64" = 
+           sum(across(contains("Ethnic Group: Asian/Asian British"))) ) %>%
+    mutate("black_25_64" = 
+             sum(across(contains("Ethnic Group: Black/African/Caribbean/Black British"))) ) %>%
+    mutate("other_25_64" = 
+           sum(across(contains("Ethnic Group: Other ethnic group"))) ) %>%
+  rename("geo_name" = "geography") %>%
+  select(contains("geo_name") | contains("25_64")) %>%
+  filter(geo_name == "England and Wales")
+
+# put together a table with all the 25 to 64 residents with the same data
+ethnicity_all_25_64_raw <- data %>%
+  #keeping only the data relating to age 25 to 64
+  select(contains("geography") | 
+           contains("Age 25 to 34") |
+           contains("Age 35 to 49") | 
+           contains("Age 50 to 64") ) %>%
+  #keeping only the data relating to Highest Level of Qualification: All, to give all residents 25 to 64 by ethinicity 
+  select(contains("geography") | 
+           contains("Highest Level of Qualification: All categories:") ) %>%
+  # adding up the year groups
+  rowwise() %>%
+  mutate("all_25_64" = 
+           sum(across(contains("Ethnic Group: All categories"))) ) %>%
+  mutate("white_uk_25_64" = 
+           sum(across(contains("Ethnic Group: White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
+  mutate("white_irish_25_64" = 
+           sum(across(contains("Ethnic Group: White: Irish"))) ) %>%
+  mutate("white_other_25_64" = 
+           sum(across(contains("Ethnic Group: White: Other White"))) ) %>%
+  mutate("mixed_25_64" = 
+           sum(across(contains("Ethnic Group: Mixed/multiple ethnic group"))) ) %>%
+  mutate("asian_25_64" = 
+           sum(across(contains("Ethnic Group: Asian/Asian British"))) ) %>%
+  mutate("black_25_64" = 
+           sum(across(contains("Ethnic Group: Black/African/Caribbean/Black British"))) ) %>%
+  mutate("other_25_64" = 
+           sum(across(contains("Ethnic Group: Other ethnic group"))) ) %>%
+  rename("geo_name" = "geography") %>%
+  select(contains("geo_name") | contains("25_64")) %>%
+  filter(geo_name == "England and Wales")
+
+# load in the Occupation by ethnic group by sex by age data
+# https://www.nomisweb.co.uk/census/2011/dc6213ew
+geographytype <- "TYPE499"
+data <- ingest("dc6213ew", geographytype)
+
+# put together a table with the level4 qualifications by ethnicity
+ethnicity_y_25_64_raw <- data %>%
+  #keeping only the data relating to all (not by gender)
+  select(contains("geography") | 
+           contains("Sex: All persons") ) %>%
+  #keeping only the data relating to age 25 to 64
+  select(contains("geography") | 
+           contains("Age 25 to 49") | 
+           contains("Age 50 to 64") ) %>%
+  #keeping only the data relating to Highest Level of Qualification: All, to give all residents 25 to 64 by ethinicity 
+  select(contains("geography") | 
+           contains("Occupation: 1. Managers") |
+           contains("Occupation: 2. Professional") ) %>%
+  # adding up the year groups
+  rowwise() %>%
+  mutate("all_25_64" = 
+           sum(across(contains("Ethnic Group: All categories"))) ) %>%
+  mutate("white_uk_25_64" = 
+           sum(across(contains("Ethnic Group: White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
+  mutate("white_irish_25_64" = 
+           sum(across(contains("Ethnic Group: White: Irish"))) ) %>%
+  mutate("white_other_25_64" = 
+           sum(across(contains("Ethnic Group: White: Other White"))) +
+           sum(across(contains("Ethnic Group: White: Gypsy or Irish Traveller"))) ) %>%
+  mutate("mixed_25_64" = 
+           sum(across(contains("Ethnic Group: Mixed/multiple ethnic group: Total"))) ) %>%
+  mutate("asian_25_64" = 
+           sum(across(contains("Ethnic Group: Asian/Asian British: Total"))) ) %>%
+  mutate("black_25_64" = 
+           sum(across(contains("Ethnic Group: Black/African/Caribbean/Black British: Total"))) ) %>%
+  mutate("other_25_64" = 
+           sum(across(contains("Ethnic Group: Other ethnic group: Total"))) ) %>%
+  rename("geo_name" = "geography") %>%
+  select(contains("geo_name") | contains("25_64")) %>%
+  filter(geo_name == "England and Wales")
+
+# join together
+# pivot to long form
+ethnicity_y_25_64_Long <- ethnicity_y_25_64_raw %>%
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  pivot_longer(cols = -geo_name,
+               names_to = "ethnicity",
+               values_to = "occupation_25_64")
+ethnicity_level4_25_64_long <- ethnicity_level4_25_64_raw %>%
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  pivot_longer(cols = -geo_name,
+               names_to = "ethnicity",
+               values_to = "qualification_25_64")
+# join in to a single table
+ethnicity_25_64_raw <- ethnicity_all_25_64_raw %>%
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  pivot_longer(cols = -geo_name,
+               names_to = "ethnicity",
+               values_to = "all_25_64") %>%
+  left_join(ethnicity_y_25_64_Long) %>%
+  left_join(ethnicity_level4_25_64_long)
+
+# tidy
+save(ethnicity_25_64_raw, file="rda/ethnicity_25_64_raw.rda")
+rm(ethnicity_level4_25_64_long, ethnicity_y_25_64_Long, ethnicity_all_25_64_raw)
+rm(data)
+
+# graph
+load("rda/ethnicity_25_64_raw.rda")
+# calculate the ratio of the working population for each ethnicity
+ethnicity_25_64 <- ethnicity_25_64_raw %>%
+  mutate(senior_occupation = occupation_25_64 / all_25_64) %>%
+  mutate(level4_qualification  = qualification_25_64 / all_25_64) %>%
+  select(ethnicity, senior_occupation, level4_qualification)
+# put together a list in order based on the senior_occupation value
+ethnicity_graph_order <- ethnicity_25_64 %>%
+  arrange(senior_occupation) %>% .$ethnicity
+# plot the graph
+ethnicity_25_64 %>% 
+  # pivot longer to include the proportions in one columns
+  pivot_longer(cols = -ethnicity,
+               names_to = "ratios",
+               values_to = "population_proportion") %>%
+  ggplot(aes(ethnicity, population_proportion, fill=ratios)) +
+  geom_bar(stat="identity", position="dodge") +
+  geom_hline(aes(yintercept=ethnicity_25_64$senior_occupation[1])) +
+  geom_text(aes(4.5, ethnicity_25_64$senior_occupation[1],
+             label="senior occupation for all residents 25 to 64"), 
+            nudge_y=0.015, size = 3.5) + 
+  geom_hline(yintercept=ethnicity_25_64$level4_qualification[1]) +
+  geom_text(aes(4.5, ethnicity_25_64$level4_qualification[1],
+                label="level4 qualification for all residents 25 to 64"), 
+            nudge_y=0.015, size = 3.5) + 
+# using the list earlier for the order on the x axis
+  scale_x_discrete(limits=ethnicity_graph_order) +
+  theme(legend.position = "bottom") +
+  theme(axis.text.x = element_text(angle = 45, vjust=1, hjust=1)) +
+  ggtitle("Proportions of 25 to 64 year olds in England and Wales") +
+  xlab("Ethnic groups") +
+  ylab("Proportion of each ethnic group")
+
+# tidy
+rm(ethnicity_25_64, ethnicity_graph_order)
 
 
 
 
 #### working code ####
-
-
-# show the p value in addition to correlation
-# https://www.displayr.com/how-to-create-a-correlation-matrix-in-r/
-install.packages("Hmisc")
-library("Hmisc")
-# Use the following code to run the correlation matrix with p-values. Note that the data has to be fed to the rcorr function as a matrix.
-mydata.rcorr = rcorr(as.matrix(mydata))
-mydata.rcorr
-# This generates one table of correlation coefficients (the correlation matrix) and another table of the p-values. 
-mydata.coeff = mydata.rcorr$r
-mydata.p = mydata.rcorr$P
 
 
