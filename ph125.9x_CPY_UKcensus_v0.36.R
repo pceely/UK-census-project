@@ -36,8 +36,8 @@ options(digits = 6)
   #   </select>
 # <input type="submit" value="Download" class="btn" id="dwnBtn">
 
-# https://www.nomisweb.co.uk/census/2011/ks101uk
-
+# test geo type
+geographytype <- "TYPE480" #regions
 # function to create download file from nomis 
 nomis_census_csv <- function(censusdata, geographytype){
   # generate filename
@@ -62,11 +62,10 @@ nomis_census_csv <- function(censusdata, geographytype){
 
 
 # Initially, TYPE480 regions
+geographytype <- "TYPE480" #regions
 # then TYPE297 'super output areas - middle layer 2011
 geographytype <- "TYPE297" #super output areas - middle layer
 # geographytype <- "TYPE499" #countries
-geographytype <- "TYPE480" #regions
-# nomis_census_csv(censusdata, geographytype)
 #creating list of census tables to take
 censusdata_list <- c("ks101ew", "ks608ew","ks102ew", "ks201ew","ks501ew", "ks103ew", "ks209ew", "ks105ew", "ks605ew", "qs203ew")
 # apply the list to download all of the data
@@ -83,7 +82,7 @@ rm(tmp, filled_form, nomis_form, nomis_session, nomis_session2, filename, nomis_
 
 
 ############ Import and clean the prediction #####################
-options(digits = 3)
+# options(digits = 3)
 # create function to read file
 ingest <- function(censustable, geography){
   print(paste("ingesting", censustable))
@@ -112,7 +111,7 @@ occupation <- data %>%
            (sum(across(contains("Sex: All persons; Occupation: 1. Managers"))) +
            sum(across(contains("Sex: All persons; Occupation: 2. Professional "))) )/occupation_all) %>% 
   select(geo_name, geo_code, geo_type, y, occupation_all)
-occupation
+# occupation
 
 #now creating a function for repeatability
 occupation_target <- function(data){
@@ -221,6 +220,7 @@ economic %>%
   "Economically active", "Economically active: In employment", 
   "occupation_all", "all_residents") %>%
   knitr::kable()
+# tidy
 rm(economic, occupation)
 
 # next to load in the ethnicity data
@@ -270,11 +270,23 @@ save(ethnicity_raw, file='rda/ethicity_raw.rda')
 names(ethnicity_raw)
 
 # reordering to identify which are the largest groups to retain
+load('rda/ethicity_raw.rda')
+# make the geo code a rowname - all data is now a value
 ethnicity_ordered <- column_to_rownames(ethnicity_raw, var="geography_code")
-ethnicity_ordered <- ethnicity_ordered %>%  rbind("total" = colSums(ethnicity_ordered))
+str(ethnicity_ordered)
+# add a new row with column sums, so totals for each ethnicity
+ethnicity_ordered <- ethnicity_ordered %>%  
+  rbind("total" = colSums(ethnicity_ordered))
+# reorder columns based on the values in the total row
 ethnicity_ordered <- ethnicity_ordered[, order(-ethnicity_ordered[which(rownames(ethnicity_ordered) == 'total'), ]) ]
-names(ethnicity_ordered) %>% head(12)
+# choose the first 11 columns, the first 11 ethnicities
+data.frame("ethnicity categories" = names(ethnicity_ordered)[2:12]) %>%  
+  knitr::kable(caption="11 most prevalent ethnicities")
 names(ethnicity_ordered)
+midrule = "\\midrule"
+data.frame("ethnicity categories" = names(ethnicity_ordered)[2:12]) %>%  
+  knitr::kable(caption="11 most prevalent ethnicities", 
+               latex_options = "striped")
 
 ethnicity_aggregated <- ethnicity_raw %>%
   rename("all_25_64" = "age25_64_All_categories_Ethnic_group",
@@ -347,9 +359,9 @@ ethnicity_predictors <- function(data){
     mutate("black_african_25_64" = 
              sum(across(contains("Black/African/Caribbean/Black British: African"))) ) %>%
     rename("geo_code" = "geography code") %>%
-    print(names(ethnicity)) %>%
+    # print(names(ethnicity)) %>%
     select(contains("geo_code") | contains("25_64")) %>%
-    print(names(ethnicity))
+    # print(names(ethnicity))
   # After this aggregation, I now need to divide by the sums of the rows, to have a normalised value for each of the ethnicities.
   print("normalising the data")
   ethnicity <- sweep(ethnicity_raw[,3:13], 1, rowSums(ethnicity_raw[,3:13]), FUN = "/")  %>%
@@ -922,7 +934,7 @@ rm(country, country_raw, country_raw_orig, country_orig)
 
 ####### repeatable code ##########
 # geographytype <- "TYPE480" #regions
-geographytype <- "TYPE297" #super output areas - middle layer
+# geographytype <- "TYPE297" #super output areas - middle layer
 # nomis_census_csv(censusdata, geographytype)
 
 #creating list of census tables to take
@@ -1103,7 +1115,8 @@ rm(industry_predictors, sex_predictors)
 rm(qualifications_predictors, age_predictors)
 
 ############ Create main set, validation set #####################
-
+load("rda/data_set_TYPE297.rda")
+names(data_set)
 # Validation set will be 10% of the data
 set.seed(2011, sample.kind="Rounding")
 test_index <- createDataPartition(y = data_set$y, times = 1, p = 0.1, list = FALSE)
@@ -1113,7 +1126,11 @@ validation <- data_set[test_index,]
 save(main, file='rda/main.rda')
 save(validation, file='rda/validation.rda')
 rm(validation, data_set, test_index)
-
+# check later work
+# main_check <- main
+# validation_check <- validation
+# load("rda/main.rda")
+# identical(main, main_check)
 
 ############ exploration and visualisation ##########
 
@@ -1139,6 +1156,8 @@ main %>% group_by(geo_type) %>%
   select(-geo_type)  %>%
   knitr::kable()
 
+summary(main$y)
+
 #graph the geographic areas
 main %>%  ggplot(aes(all_residents))  + 
   geom_histogram(bins = 30, color = "black") +
@@ -1155,18 +1174,20 @@ main %>% group_by(geo_type) %>%
 #box plot 
 #create a "tidy" long form version for the tidyverse functions 
 main_tidy <- main %>%  
+  select(-occupation_all, -all_residents, -geo_type, -geo_name, -age_median) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   #pivot to a long version with a row per feature/value
-  pivot_longer(cols = (contains("25_64") | contains("ratio")), 
-                       names_to = "feature", 
-                       values_to = "proportion") %>%
-  select(-occupation_all, -all_residents, -geo_type, -geo_name)
+  pivot_longer(cols = c(-geo_code, -y),
+               names_to = "feature", 
+               values_to = "proportion")
 #plot the box plot
 main_tidy %>%
   ggplot(aes(x=reorder(feature, proportion, FUN=mean), y=proportion))  + 
   geom_boxplot() +
-  ggtitle("Boxplot of features") +
-  ylab("proportion") + 
-  xlab("feature name, reordered by mean") + 
+  ggtitle("Boxplot of feature values") +
+  ylab("Feature value, proportion of 25 to 64 in the area") + 
+  xlab("Features, reordered by mean") + 
   theme(axis.text.x=element_text(angle = 90, hjust=1, vjust=0.5))
 
 #choosing the 10 features with the lowest mean
@@ -1182,7 +1203,7 @@ heatmap(x = correlationmatrix, col = RColorBrewer::brewer.pal(11, "Spectral"))
 
 # find attributes that are highly corrected
 highlycorrelated <- findCorrelation(correlationmatrix, cutoff=0.8, exact = TRUE, names=TRUE)
-highlycorrelated
+highlycorrelated %>% knitr::kable()
 
 #looking at the correlation for uk_25_64 specifically
 data.frame(correlationmatrix) %>%
@@ -1517,6 +1538,10 @@ correlationmatrix[,index][abs(correlationmatrix[,index]) > 0.7]
 highlycorrelated[2]
 index <- str_which(names(data.frame(correlationmatrix)), highlycorrelated[2])
 correlationmatrix[,index][abs(correlationmatrix[,index]) > 0.7]
+data.frame(correlationmatrix[,index][abs(correlationmatrix[,index]) > 0.7]) %>%
+  rename("correlation" = starts_with("correlationmatri")) %>%
+  rownames_to_column(var="feature name") %>%
+  knitr::kable()
 #tidy up
 save(highlycorrelated, file="rda/highlycorrelated.rda")
 save(categorical_features, file="rda/categorical_features.rda")
@@ -1810,6 +1835,8 @@ save(rmse_results, file="rda/rmse_results.rda")
 save(train_knn, file="rda/train_knn.rda")
 save(train_set_knn_small, file="rda/train_set_knn_small.rda")
 save(train_set_knn_final_nocat, file="rda/train_set_knn_final_nocat.rda")
+save(result_knn_train_set_knn_final_nocat, 
+     file="rda/result_knn_train_set_knn_final_nocat.rda")
 rm(result_knn_train_final_norm, result_knn_train_set_knn_final_nocat)
 rm(result_knn_train_smaller, result_knn_train_small)
 rm(result_knn_train_set_knn_small)
@@ -2089,24 +2116,21 @@ identical(result_lasso_train_set_final$results$rmse,
           result_glm_train_set_final$results$rmse)
 all.equal(result_lasso_train_set_final$results$rmse,
           result_glm_train_set_final$results$rmse)
-# check whether the RMSE are identical, or almost
+# check whether the y_hat are identical, or almost
 identical(result_lasso_train_set_final$y_hat,
           result_glm_train_set_final$y_hat)
 all.equal(result_lasso_train_set_final$y_hat,
           result_glm_train_set_final$y_hat)
-
-
-# comparing gam and gamloess
 # plotting graphs
 data.frame(result_lasso_train_set_final$y_hat,
            result_glm_train_set_final$y_hat) %>%
   ggplot(aes(result_lasso_train_set_final$y_hat, 
              result_glm_train_set_final$y_hat)) + 
   geom_point() +
+  geom_abline(slope = 1, intercept = 0, col="blue")  +
   ggtitle("Comparing the GLM and LASSO algorithms") +
-  xlab("GLM predictions") +
-  ylab("LASSO predictions")
-
+  xlab("LASSO predictions") +
+  ylab("GLM predictions")
 
 #tidy
 save(result_lasso_train_set_final, file="rda/result_lasso_train_set_final.rda")
@@ -2203,17 +2227,28 @@ identical(result_bayesglm_train_set_final$results$rmse,
           result_glm_train_set_final$results$rmse)
 all.equal(result_bayesglm_train_set_final$results$rmse,
           result_glm_train_set_final$results$rmse)
-# check whether the RMSE are identical, or almost
+# check whether the y_hat are identical, or almost
 identical(result_bayesglm_train_set_final$y_hat,
           result_glm_train_set_final$y_hat)
 all.equal(result_bayesglm_train_set_final$y_hat,
           result_glm_train_set_final$y_hat)
 y_hat_bayesglm <- result_bayesglm_train_set_final$y_hat
+# plotting graphs
+data.frame(result_bayesglm_train_set_final$y_hat,
+           result_glm_train_set_final$y_hat) %>%
+  ggplot(aes(result_bayesglm_train_set_final$y_hat, 
+             result_glm_train_set_final$y_hat)) + 
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, col="blue")  +
+  ggtitle("Comparing the BayesGLM and GLM algorithms") +
+  xlab("BayesGLM predictions") +
+  ylab("GLM predictions")
 
 #tidy
 rm(y_hat_bayesglm, result_bayesglm_train_smaller)
 rm(result_bayesglm_train_set_final, result_bayesglm_train_small)
 save(rmse_results, file="rda/rmse_results.rda")
+save(result_bayesglm_train_set_final, file="rda/result_bayesglm_train_set_final.rda")
 
 
 #### Generalized Additive Model using LOESS - gamLoess ####
@@ -2449,15 +2484,12 @@ load("rda/result_svm2_train_set_final.rda")
 load("rda/result_svm_train_set_final.rda")
 result_svm2_train_set_final$results$rmse
 result_svm_train_set_final$results$rmse
-y_hat_svm2 <- result_svm2_train_set_final$y_hat
-y_hat_svm <- result_svm_train_set_final$y_hat
-
 # check whether the RMSE are identical, or almost
 identical(result_svm2_train_set_final$results$rmse,
           result_svm_train_set_final$results$rmse)
 all.equal(result_svm2_train_set_final$results$rmse,
           result_svm_train_set_final$results$rmse)
-# check whether the RMSE are identical, or almost
+# check whether the y_hat are identical, or almost
 identical(result_svm2_train_set_final$y_hat,
           result_svm_train_set_final$y_hat)
 all.equal(result_svm2_train_set_final$y_hat,
@@ -2521,11 +2553,11 @@ rm(result_svmradial_train_final_nocat)
 rm(result_svmradial_train_set_final)
 
 ##### ensemble   #####
+load("rda/rmse_results.rda")
 # Identify the leading models, the top 5
 rmse_results %>%
   arrange(rmse) %>% 
-  # filter(str_detect(method, "train_set_final") ) %>%
-  filter(str_detect(method, "glm") ) %>%
+  filter(str_detect(method, "train_set_final") ) %>%
   # head(10) %>% 
   knitr::kable()
 # create an ensemble y hats
@@ -2626,12 +2658,12 @@ feature_rank <- glm_rank %>%
   left_join(glmboost_rank) %>%
   mutate(mean_overall = (glm_overall+gbm_overall+glmboost_overall)/3, .after = feature) %>%
   mutate(mean_rank = (glm_rank+gbm_rank+glmboost_rank)/3, .after = feature) 
-# arrange by mean ranking and display top 15
+# arrange by mean ranking and display top 9
 feature_rank %>% select(feature, mean_rank, mean_overall) %>%
-  arrange(mean_rank) %>% head(15) %>% knitr::kable()
-# arrange by mean score and display top 15
+  arrange(mean_rank) %>% head(9) %>% knitr::kable()
+# arrange by mean score and display top 9
 feature_rank %>% select(feature, mean_rank, mean_overall) %>%
-  arrange(desc(mean_overall)) %>% head(15) %>% knitr::kable()
+  arrange(desc(mean_overall)) %>% head(9) %>% knitr::kable()
 
 # plotting the top 9
 load("rda/feature_rank.rda")
@@ -2748,11 +2780,12 @@ glm_top10_top50_tmp <- sapply(10:50, function(n){
     results_train_method(train_topn, test_set_final, "glm")
   result_glm_train_topn$results[,2]
 })
-
 #extract the rmse values and put in a table
 glm_top10_top50 <- t(data.frame(glm_top10_top50_tmp)) %>%
   cbind(feature_no = 10:50)
 colnames(glm_top10_top50) <- c("rmse", "feature_no")
+# load the data
+# load("rda/glm_top10_top50.rda")
 #plot the values
 data.frame(glm_top10_top50) %>%
   ggplot(aes(x=feature_no, y=rmse)) +
@@ -2803,7 +2836,6 @@ svm_top20_top40 <- t(data.frame(svm_top20_top40_tmp)) %>%
   cbind(feature_no = seq(20, 40, 2))
 colnames(svm_top20_top40) <- c("rmse", "feature_no")
 svm_top20_top40
-
 #load the calculation from file
 # load("rda/svm_top20_top40.rda")
 #plot the values
@@ -2814,16 +2846,15 @@ data.frame(svm_top20_top40) %>%
   xlab("number of features, in priority order") +
   ylab("RMSE")
 
+# tidy up
 save(glm_top10_top50, file="rda/glm_top10_top50.rda")
 save(svmradial_top20_top40, file="rda/svmradial_top20_top40.rda")
 save(svm_top20_top40, file="rda/svm_top20_top40.rda")
 rm(svm_top20_top40, svm_top20_top40_tmp)
 rm(svmradial_top20_top40, svmradial_top20_top40_tmp)
 rm(glm_top10_top50, glm_top10_top50_tmp)
-load("rda/svmradial_top20_top40.rda")
 
 #### gam and gam loess again ####
-
 # running on GAM with 25 features
 train_top25 <- topfeature_overall(25, train_set_final)
 # with the train_top25 training set
@@ -2845,7 +2876,8 @@ train_top28 <- topfeature_overall(28, train_set_final)
 result_gam_train_top28 <- 
   results_train_method(train_top28, test_set_final, "gam")
 # extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, tail(result_gam_train_top28$results, 1))
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_gam_train_top28$results, 1))
 rmse_results %>% knitr::kable()
 # tidy
 save(result_gam_train_top28, file="rda/result_gam_train_top28.rda")
@@ -2862,11 +2894,14 @@ rmse_results %>% knitr::kable()
 # tidy
 save(result_gamLoess_train_top28, file="rda/result_gamLoess_train_top28.rda")
 rm(result_gamLoess_train_top28)
+save(rmse_results, file="rda/rmse_results.rda")
 
 #checking the overall performance
 rmse_results %>% arrange(rmse) %>% head(10) %>%   knitr::kable() 
 
 # comparing gam and gamloess
+load("rda/result_gamLoess_train_top28.rda")
+load("rda/result_gam_train_top28.rda")
 y_hat_gam <- result_gam_train_top28$y_hat
 y_hat_gamLoess <- result_gamLoess_train_top28$y_hat
 data.frame(y_hat_gam, y_hat_gamLoess) %>%
@@ -2882,6 +2917,9 @@ data.frame(y_hat_gam, y_hat_gamLoess) %>%
   ggtitle("Comparing GAM vs GAM Loess predictions") +
   xlab("Delta between GAM and GAM Loess predictions") +
   ylab("number of predictions in each interval")
+# tidy
+rm(y_hat_gam, y_hat_gamLoess)
+rm(result_gamLoess_train_top28, result_gam_train_top28)
 
 # running on knn with 28 features, less age and area
 train_top28_knn <- train_top28 %>%
@@ -2899,7 +2937,8 @@ rmse_results %>% knitr::kable()
 # Identify the leading models, the new top 5
 # load("rda/rmse_results.rda")
 rmse_results %>%
-  arrange(rmse) %>% head(20) %>% knitr::kable()
+  filter(str_detect(method, 'Ensemble', negate=TRUE) ) %>% 
+  arrange(rmse) %>% head(15) %>% knitr::kable()
 
 #loading the separate model information
 load("rda/result_glm_train_set_final.rda")
@@ -2907,7 +2946,6 @@ load("rda/result_svm_train_set_final.rda")
 load("rda/result_svmradial_train_set_final.rda")
 load("rda/result_gam_train_top28.rda")
 load("rda/result_gamLoess_train_top28.rda")
-y_hat_glm <- result_glm_train_set_final$y_hat
 
 # an ensemble of the best five models
 y_hat_ens_table3 <- 
@@ -2925,7 +2963,9 @@ head(y_hat_ens_table3)
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table3$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
                           tibble(method="Ensemble3 glm, svm, svmRadial, gam, gamLoess", rmse = rmse_ens))
-rmse_results %>% knitr::kable()
+rmse_results %>% 
+  arrange(rmse) %>% head(20) %>% 
+  knitr::kable(caption="Leading models including the ensembles, with MSOA")
 
 #### ensemble 4 ####
 # an ensemble of the best three models
@@ -2964,6 +3004,7 @@ rmse_results %>%
 
 # tidy up
 save(y_hat_ens_table5, file="rda/y_hat_ens_table5.rda")
+# load("rda/y_hat_ens_table5.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(y_hat_ens_table3, rmse_ens, y_hat_ens_table4)
 rm(y_hat_ens_table5)
@@ -2978,7 +3019,8 @@ y_hat_ens_table5 %>%
   rename(ensemble_y_hat=y_hat_ave) %>%
   pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
   ggplot(aes(x=y_hat, y=y, col=model)) +
-  geom_point() +  
+  # geom_point() +  
+  geom_point(size=0.7) +
   geom_abline(slope = 1, intercept = 0, col="black")  +
   facet_grid(. ~model) +
   ggtitle("Comparing ensemble5 predictions vs the outcome y") +
@@ -3078,6 +3120,7 @@ rmse_results_validation %>% knitr::kable()
 #tidy
 save(rmse_results_validation, file="rda/rmse_results_validation.rda")
 save(result_svmradial_main, file="rda/result_svmradial_main.rda")
+load("rda/rmse_results_validation.rda")
 
 # run on gam
 # load top 28 features with the GLM, GBM and GLM boost models on the train/test data
@@ -3096,6 +3139,8 @@ save(result_gam_main_top28, file="rda/result_gam_main_top28.rda")
 save(rmse_results_validation, file="rda/rmse_results_validation.rda")
 
 # ensemble of 2
+load("rda/result_gam_main_top28.rda")
+load("rda/result_svmradial_main.rda")
 y_hat_ens_main <- 
   data.frame(svmradial_y_hat = result_svmradial_main$y_hat, 
              gam_y_hat = result_gam_main_top28$y_hat) %>%
@@ -3147,23 +3192,22 @@ censusdata_list <- c("ks608ew", "ks102ew", "lc2101ew", "lc2103ew","lc6110ew", "l
 download_censusdata("2013265927TYPE299", censusdata_list)
 #import the data for London
 data_set <- import_data("2013265927TYPE299")
-#clean up
+load("rda/data_set_2013265927TYPE299.rda")
+# tidy up
 data_set_london <- data_set
 rm(filename)
 rm(geographytype)
 
-
 # Yorkshire and The Humber
 # <option value="2013265923TYPE299">output areas 2011 in Yorkshire and The Humber
-geographytype <- "2013265923TYPE299" # output areas 2011 in Yorkshire and The Humber
+# geographytype <- "2013265923TYPE299" # output areas 2011 in Yorkshire and The Humber
 # apply the list to download all of the data
 download_censusdata("2013265923TYPE299", censusdata_list)
 #import the data for Yorkshire
 data_set <- import_data("2013265923TYPE299")
-data_set_yorkshire <- data_set
 load("rda/data_set_2013265923TYPE299.rda")
-
 # tidy up
+data_set_yorkshire <- data_set
 rm(ingest, marital_predictors, country_predictors, occupation_target)
 rm(ethnicity_predictors, household_predictors, religion_predictors)
 rm(industry_predictors, sex_predictors, qualifications_predictors, age_predictors)
@@ -3251,26 +3295,26 @@ load("rda/main_soa.rda")
 load("rda/main.rda")
 
 main_soa %>%  ggplot(aes(all_residents))  + 
-  geom_histogram(bins = 30, color = "black") +
+  geom_histogram(bins = 50, color = "black") +
   ggtitle("Size of the geographic areas") +
   xlab("number of residents in the SOA area") +
   ylab("count of numbers of SOA areas")
 #table of key data points of the sizes of the SOA areas
-main_soa_summary <- c(mean = mean(main_soa$all_residents),
+main_soa_sizes <- c(mean = mean(main_soa$all_residents),
                       sd=sd(main_soa$all_residents),
                       max = max(main_soa$all_residents), 
                       min = min(main_soa$all_residents))
 #table of key data points of the sizes of the MSOA areas
-main_summary <- c(mean = mean(main$all_residents),
+main_sizes <- c(mean = mean(main$all_residents),
                      sd=sd(main$all_residents),
                      max = max(main$all_residents), 
                      min = min(main$all_residents))
 # displaying in a table for comparison
-data.frame(main_soa_summary) %>% 
-  cbind(data.frame(main_summary)) %>%
-  knitr::kable()
+data.frame("Residents_in_SOA" = main_soa_sizes) %>% 
+  cbind(data.frame("Residents_in_MSOA" = main_sizes)) %>%
+  knitr::kable(caption="Comparison of number of residents in SOA and MSOA")
 # tidy
-rm(main, main_soa, main_soa_summary, main_summary)
+rm(main, main_soa, main_soa_sizes, main_sizes)
 
 #graph the outcome y
 tmp <- data.frame(SOA=train_soa_final$y) %>%
@@ -3291,21 +3335,21 @@ data.frame(MSOA=train_set_final$y) %>%
 
 #table of key data points of the outcome y
 # summary info for the SOA data
-train_soa_summary <- c(mean = mean(train_soa_final$y),
+train_soa_y <- c(mean = mean(train_soa_final$y),
                              sd=sd(train_soa_final$y),
                              max = max(train_soa_final$y), 
                              min = min(train_soa_final$y))
 # summary info for the MSOA data
-train_soa_summary <- c(mean = mean(train_set_final$y),
+train_msoa_y <- c(mean = mean(train_set_final$y),
                              sd=sd(train_set_final$y),
                              max = max(train_set_final$y), 
                              min = min(train_set_final$y))
 # displaying in a table for comparison
-data.frame(train_soa_summary) %>% 
-  cbind(data.frame(train_soa_summary)) %>%
-  knitr::kable()
+data.frame("y_SOA" = train_soa_y) %>% 
+  cbind(data.frame("y_MSOA" = train_msoa_y)) %>%
+  knitr::kable(caption="Comparison of y, proportion of senior managers and professional occupations in SOA and MSOA")
 # tidy
-rm(tmp, train_soa_final_summary, train_set_final_summary)
+rm(tmp, train_soa_y, train_soa_y)
 
 # graph illustrating the impact of London or Yorkshire
 test_soa_final %>%
@@ -3321,10 +3365,30 @@ test_soa_final %>%
   ylab("count of numbers of SOA areas")
 
 #looking at the features
-#box plot 
-train_soa_final %>%  
+
+main_tidy <- main %>%  
+  select(-occupation_all, -all_residents, -geo_type, -geo_name, -age_median) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   #pivot to a long version with a row per feature/value
-  pivot_longer(cols = (contains("25_64") | contains("ratio")), 
+  pivot_longer(cols = c(-geo_code, -y),
+               names_to = "feature", 
+               values_to = "proportion")
+# box plot of features expressed as a ratio
+# identify the geography features not necessary for this graph
+load("rda/geo_lookup.rda")
+# pull out only the places, not the geo and area columns
+geography_features <-  intersect(
+  str_subset(names(geo_lookup),  "area", negate = TRUE),
+  str_subset(names(geo_lookup),  "geo", negate = TRUE))
+# plot the graph
+train_soa_final %>%  
+  # remove columns not needed, features that are not ratios
+  select(-age_median, -area_code, -all_of(geography_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  #pivot to a long version with a row per feature/value
+  pivot_longer(cols = c(-y),
                names_to = "feature", 
                values_to = "proportion") %>%
   ggplot(aes(x=reorder(feature, proportion, FUN=mean), y=proportion))  + 
@@ -3738,7 +3802,7 @@ train_soa_final %>%  select(y, all_of(qualifications_features)) %>%
                values_to = "proportion") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for qualification features in SOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3751,7 +3815,7 @@ train_set_final %>%  select(y, all_of(qualifications_features)) %>%
                values_to = "proportion") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for qualification features in MSOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3777,7 +3841,7 @@ train_set_final %>%
   rbind(train_soa_final_excerpt) %>%
   ggplot(aes(y, level4_25_64, col=white_uk_25_64))  + 
   facet_grid(.~area_type) +
-  geom_point(size=1) +
+  geom_point(size=0.7) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for level4 features") +
   xlab("y, proportion of managerial & professional") +
@@ -3790,7 +3854,7 @@ train_soa_final %>%
   mutate(white_uk_strata = round(white_uk_25_64, 1)) %>%
   ggplot(aes(y, level4_25_64, col=white_uk_25_64))  + 
   facet_wrap(.~white_uk_strata) +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for level4 features, stratified by 'white UK' in SOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3817,7 +3881,7 @@ train_soa_final %>%  select(y, all_of(industry_features)) %>%
                values_to = "proportion") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for industry features in SOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3832,7 +3896,7 @@ train_set_final %>%  select(y, all_of(industry_features)) %>%
                values_to = "proportion") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for industry features in MSOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3850,7 +3914,7 @@ train_soa_final %>%  select(y, all_of(household_features)) %>%
                values_to = "proportion") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for household features in SOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3866,7 +3930,7 @@ train_set_final %>%  select(y, all_of(household_features)) %>%
                values_to = "proportion") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for household features in MSOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3884,7 +3948,7 @@ train_soa_final %>%  select(y, all_of(marital_features)) %>%
                values_to = "proportion") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for marital features in SOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3900,7 +3964,7 @@ train_set_final %>%  select(y, all_of(marital_features)) %>%
                values_to = "proportion") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for marital features in MSOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3933,6 +3997,7 @@ importance$importance
 
 # tidy up
 save(result_glm_train_msoa_noqual, file="rda/result_glm_train_msoa_noqual.rda")
+load("rda/result_glm_train_msoa_noqual.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(qualifications, qualifications_features)
 rm(train_msoa_noqual, result_glm_train_msoa_noqual)
@@ -3955,7 +4020,7 @@ train_soa_final %>%
   # str_replace_all(., "_25_64", "") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for ethnicity features in SOA") +
   xlab("y, proportion of managerial & professional") +
@@ -3973,7 +4038,7 @@ train_set_final %>%
                values_to = "proportion") %>%
   ggplot(aes(y, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for ethnicity features in MSOA") +
   xlab("y, proportion of managerial & professional") +
@@ -4006,7 +4071,8 @@ data.frame(train_soa_rcorr$r) %>%
   left_join(train_soa_ethnicity_p) %>%
   # reorder and display
   arrange(desc(abs(y_correlation_coefficient))) %>%
-  knitr::kable()
+  knitr::kable(caption = "Correlation and P results for ethnicity and y in SOA") 
+
 
 # extract the ethnicity features for MSOA
 # calculate the correlation matrix and p valuer matrix
@@ -4032,8 +4098,7 @@ data.frame(train_msoa_rcorr$r) %>%
   left_join(train_msoa_ethnicity_p) %>%
   # reorder and display
   arrange(desc(abs(y_correlation_coefficient))) %>%
-  knitr::kable()
-
+  knitr::kable(caption = "Correlation and P results for ethnicity and y in MSOA") 
 #ethnicity features vs level4 soa
 load('rda/ethnicity.rda')
 ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
@@ -4050,7 +4115,7 @@ train_soa_final %>%
   # str_replace_all(., "_25_64", "") %>%
   ggplot(aes(level4, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Level4 qualifications for ethnicity features in SOA") +
   xlab("level4, proportion of degree or equivalent") +
@@ -4068,7 +4133,7 @@ train_set_final %>%
                values_to = "proportion") %>%
   ggplot(aes(level4, proportion))  + 
   facet_wrap(.~feature, scales = "free_y") +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Level4 qualifications for ethnicity features in MSOA") +
   xlab("level4, proportion of degree or equivalent") +
@@ -4096,7 +4161,7 @@ data.frame(train_soa_rcorr$r) %>%
   left_join(train_soa_level4_p) %>%
   # reorder and display
   arrange(desc(abs(level4_correlation_coefficient))) %>%
-  knitr::kable()
+  knitr::kable(caption = "Correlation and P results for ethnicity and level4 in SOA") 
 
 # extract the ethnicity features for MSOA
 # extract the p-value result for level4
@@ -4120,7 +4185,7 @@ data.frame(train_msoa_rcorr$r) %>%
   left_join(train_msoa_level4_p) %>%
   # reorder and display
   arrange(desc(abs(level4_correlation_coefficient))) %>%
-  knitr::kable()
+  knitr::kable(caption = "Correlation and P results for ethnicity and level4 in MSOA") 
 
 # looking at stratification for the black african, soa
 train_soa_final %>%
@@ -4132,7 +4197,7 @@ train_soa_final %>%
   filter(black_african_strata <= 0.4) %>%
   ggplot(aes(y, level4_25_64, col=black_african_25_64))  + 
   facet_wrap(.~black_african_strata) +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for level4 features, stratified by 'Black African' in SOA") +
   xlab("y, proportion of managerial & professional") +
@@ -4148,7 +4213,7 @@ train_soa_final %>%
   filter(black_other_strata <= 0.3) %>%
   ggplot(aes(y, level4_25_64, col=black_other_25_64))  + 
   facet_wrap(.~black_other_strata) +
-  geom_point(size=1) +
+  geom_point(size=0.5) +
   geom_smooth(method = "lm") +
   ggtitle("Outcome y for level4 features, stratified by 'Black other' in SOA") +
   xlab("y, proportion of managerial & professional") +
@@ -4186,9 +4251,9 @@ eth_corr %>%
   filter(correlation >= 0.4) %>%
   ggplot(aes(strata, correlation, col=ethnicity))  + 
   geom_line() +
-  ggtitle("Correlation between y and level4 qualification for ethinicity groups in SOA") +
+  ggtitle("Correlation by ethnicity between y and level4 in SOA") +
   xlab("proportion of residents with ethnicity") +
-  ylab("correlation between senior occupations and level4 qualifications")
+  ylab("correlation between y and level4 qualifications")
 
 # tidy
 rm(eth_corr_list, eth_corr) 
@@ -4368,7 +4433,7 @@ ethnicity_25_64 %>%
             nudge_y=0.015, size = 3.5) + 
 # using the list earlier for the order on the x axis
   scale_x_discrete(limits=ethnicity_graph_order) +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, vjust=1, hjust=1)) +
   ggtitle("Proportions of 25 to 64 year olds in England and Wales") +
   xlab("Ethnic groups") +
