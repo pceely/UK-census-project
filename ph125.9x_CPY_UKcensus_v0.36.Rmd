@@ -1,7 +1,7 @@
 ---
 title: "Choose Your Own project - Using UK census data to predict occupations"
 author: "Paul Ceely"
-date: "21/08/2020"
+date: "26/08/2020"
 output:
   pdf_document:
     toc: yes
@@ -10,14 +10,26 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.height=3)
-# knitr::opts_chunk$set(dev = 'jpeg')
+# default chunk settings
+# include code
+knitr::opts_chunk$set(echo = TRUE)
+# a reduced height vs the default
+knitr::opts_chunk$set(fig.height=3)
+# set graphs to be png images rather than contain all the data
 knitr::opts_chunk$set(dev = 'png')
-setwd("/Users/paulceely/Documents/study/Data-Science-R/ph125.9.Capstone/ChooseYourOwn")
+# increase the quality over the default
+knitr::opts_chunk$set(dpi=150)
+# knitr::opts_chunk$set(echo = TRUE, fig.height=3, dpi=120)
+# knitr::opts_chunk$set(dev = 'jpeg')
+
+# setwd("/Users/paulceely/Documents/study/Data-Science-R/ph125.9.Capstone/ChooseYourOwn")
+current_directory <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(current_directory)
 library(tidyverse)
 library(stringr)
 library(rvest)
 library(caret)
+library(magick)
 options(digits = 6)
 ```
 
@@ -35,7 +47,7 @@ developed a new data set from the raw census data to enable answering the follow
 * predict the proportion of working age people each area that are one of the managerial and professional occupations
 
 <!-- The most granular data is provided for "super output area" (SOA) an area defined for the census, of at least 100 people, but aiming for larger than 125 households, which provides over 130,000 data points providing a good level of detail and variability.  -->
-Focus was on the  Middle layer Super Output Areas - 2011" (MSOA) which gives around 7000 areas to work with.MSOA areas, but I tested on a subset of the SOA at the end.
+Focus was on the  Middle layer Super Output Areas - 2011" (MSOA) which gives around 7000 areas to work with MSOA areas, but the models and methodology were tested on a subset of the SOA at the end.
 
 For this project, 
 approach was to look at a large number of models to identify which ones were most useful and then build an ensemble.
@@ -74,7 +86,7 @@ This project is part of the **EDX course HarvardX: PH125.9x Data Science: Capsto
 The project is inspired by the UCI machine learning repository, to predict wages based on census data, here https://archive.ics.uci.edu/ml/datasets/Adult, and also the recent Black Lives Matter movements and recognition of the under-representation of certain groups in senior positions within society.
 https://www.theguardian.com/business/2020/jul/28/bame-representation-uk-top-jobs-colour-of-power-survey 
 
-I will be using the UK 2011 census data.  This data does not have individual information, instead numbers within a geographical area, and in addition, it does not include pay, but does include occupation.
+Instead this project focuses on the UK, and uses the UK 2011 census data.  This data does not have individual information, instead numbers within a geographical area, and in addition, it does not include pay, but does include occupation.
 
 Therefore the challenge is to:
 
@@ -84,7 +96,8 @@ As the target it to predict the proportion in an area, this can be treated as co
 
 The accuracy / error evaluation methodology will be developed through the work, but initially, as this is a continuous problem, it would be appropriate to use a loss function.  The simplest is the root mean squared error (RMSE) for each geo location area.
 
-My aim here is to gain some understanding of the underlying causes of differences, so I will try and focus on techniques that permit some interpretation, although I will look at other methods as well.
+As well as a machine learning exercise, the project aims to gain some understanding of the underlying causes of differences, and therefore there will be a preference for techniques that permit some interpretation.
+
 
 ## Key steps   
 Key steps carried out:  
@@ -103,25 +116,26 @@ Key steps carried out:
 
 The methodology and code was developed using insight gained from the course, and also in the accompanying text book **An Introduction to Data Science, by Rafael A Irizarry,  https://rafalab.github.io/dsbook/**.
 
-# Methodology
+\newpage
+# Methodology and data preparation
 <!-- a methods/analysis section that explains the process and techniques used, including data cleaning, data exploration and visualization, insights gained, and your modeling approaches (you must use at least two different models or algorithms); -->
 
 ## Identification of data sources
 <!-- 1.  Identify potentially useful data from the UK Census -->
 
-The most recent census in the UK is in 2011.  There are various sources and I used the information on the Office for National Statistics (ONS) as a starting point, here https://www.ons.gov.uk/census/2011census/2011censusdata/2011censususerguide/variablesandclassifications.
+The most recent census in the UK is in 2011.  The information on the Office for National Statistics (ONS) was used as a starting point for the data, here https://www.ons.gov.uk/census/2011census/2011censusdata/2011censususerguide/variablesandclassifications.
 
-This in turn provided a link to the Nomis web site, provided buy Durham University on behalf of the ONS, as the official labour market statistics.  The following link provides a list of the tables from the 2011 UK census  https://www.nomisweb.co.uk/census/2011/data_finder 
+This links to the Nomis web site, provided buy Durham University on behalf of the ONS, as the source of official labour market statistics.  The following link provides a list of the tables from the 2011 UK census  https://www.nomisweb.co.uk/census/2011/data_finder 
 
-The most granular data is provided for "super output area" (SOA) an area defined for the census, of at least 100 people, but aiming for larger than 125 households, which provides over 130,000 data points providing a good level of detail and variability.  This is a very large data set, and will be difficult to handle, for someone new to this, and therefore I will focus this study on a smaller data set, however, I will test with the SOA at the end to validate the work.
+The most granular data is provided for "super output area" (SOA) an area defined for the census, of at least 100 people, but aiming for larger than 125 households, which provides over 130,000 data points providing a good level of detail and variability.  This is a very large data set, and will be challenging to develop a new methodology for it, and therefore this study will focus on a smaller data set, however, the SOA will be tested at the end to verify that the methodology works.
 
-For this project, I will be using the Middle layer Super Output Areas - 2011" (MSOA) which gives around 7000 areas to work with.
+The Middle layer Super Output Areas - 2011" (MSOA) is a suitable level or granularity, with good detail from the various tables, with around 7000 areas to work with.
 
-In order to prove the methodology particularly of the source data process, data preparation, cleanup and cross checking the numbers between the tables I will work with the "regions" geographic ares. 
+For the initial data processing and  preparation, cleanup and cross checking the numbers between the tables the "regions" geographic areas will be used for ease of troubleshooting.
 
 There appears to be more detailed data available for England and Wales, enabling further clean up (for example, to baseline on the same totals, working age and so on), and therefore this will be used.
 
-The following are the data tables from the census used to construct the data.  I have focused here on indicators, trying to avoid ones which may be due to a good job such as size of house and so on.
+The following are the data tables from the census used to construct the data.  The focus is on indicators, trying to avoid information which may be due to the effects of having a good job such as size of house and so on.  The UCI data set also provided guidance on suitable data to be developed in to the features.
 
 Table: Census variables with name and location of the data tables
 
@@ -165,7 +179,7 @@ Working wih the occupation data initially, the target values will be created as 
 
 ### Data import
 
-I created a function to download the files from Nomis, and then saved all the csv files to the ~/data directory.
+A function was created to download the files from Nomis, which for a given geography type and table name, saved the csv files to the ~/data directory.
 
 ``` {r downloading data from nomis, eval=FALSE}
 # test geo type
@@ -193,7 +207,7 @@ nomis_census_csv <- function(censusdata, geographytype){
 }
 ```
 
-And then created a function to download all the relevant census tables at once, for a specific geography type (SOA, MSOA etc.).
+In order to download all the relevant census tables at once,a loop was used to cycle through a list of tables, downloading all the tables for a specified geography type (SOA, MSOA etc.).
 
 ```{r mapping to download census files, eval=FALSE}
 # then TYPE297 'super output areas - middle layer 2011
@@ -213,7 +227,7 @@ tmp <- lapply(censusdata_list, function(censusdata){
 })
 ```
 
-Finally I created a function to import the data in to R from the file created.
+Finally a function was created to import the data in to R from the saved csv files.
 
 ```{r function to import in to R, eval=FALSE}
 ingest <- function(censustable, geography){
@@ -262,7 +276,7 @@ occupation_target <- function(data){
            "geo_type" = "Rural Urban", 
            "occupation_all" = "Sex: All persons; Occupation: All categories: Occupation; measures: Value") %>%
     rowwise() %>%
-    # calculate the ratiof of managers and professionals
+    # calculate the ratio of managers and professionals
     mutate(y = 
        (sum(across(contains("Sex: All persons; Occupation: 1. Managers"))) +
         sum(across(contains("Sex: All persons; Occupation: 2. Professional "))) )
@@ -271,7 +285,6 @@ occupation_target <- function(data){
   #save file
   save(occupation, file='rda/occupation.rda')
 }
-
 #running the function on the data set
 occupation_target(data)
 #adding to main data set
@@ -282,7 +295,7 @@ data_set <- occupation
 
 ### Sex/gender feature 
 
-Starting with the Sex data set, which also includes the total number of people.  It can be seen that the total number of residents listed in the Occupation table is roughly half of the total in this table.  On the other hand, the Sex data is fairly static, with more women then men everywhere.  I have used the female ratio, although this is for the full population rather than the Occupation group, which may not be right.
+Starting with the Sex data set, which also includes the total number of people.  It can be seen that the total number of residents listed in the Occupation table is roughly half of the total in this table.  On the other hand, the Sex/gender data is fairly static, with more women then men everywhere.  The female ratio calculated is for the full population rather than the Occupation group.
 
 ```{r ingest sex data, eval=FALSE}
 #load in residents and sex data
@@ -296,8 +309,7 @@ sex <- data %>%
 #adding to main data set
 data_set <- data_set %>%
   left_join(sex) %>%
-  select(-other, -females, -males, -mgr_prof) %>%
-  mutate(occ_ratio = occupation_all/all_residents)
+  select(-females, -males)
 ```
 
 #### Age feature
@@ -309,8 +321,12 @@ In order to have the baseline for the features correct, it is necessary to under
 Typically in the census, there is a breakdown of 16-74, as well as 20-64, but those age ranges are still larger than the Occupation total.
 
 ```{r ingesting the age information, eval=FALSE}
-data <- ingest("ks102ew")
+# load in age data
+# https://www.nomisweb.co.uk/census/2011/ks102ew
+# import the new table with age data
+data <- ingest("ks102ew", geographytype)
 names(data)
+#look at all of the ages, to find the right ones to work on
 age <- data %>%
   rename_at(vars(contains("Age")), ~str_replace_all(., "; measures: Value", "")) %>%
   rename_at(vars(contains("Age")), ~str_replace_all(., "Age: Age ", "age_")) %>%
@@ -365,6 +381,10 @@ The value in the Occupation is near to the "Economically Active" column, slightl
 The code to create the age feature is very simple, using the median age column.
 
 ```{r creating the age feature, eval=FALSE}
+# load in age data
+# https://www.nomisweb.co.uk/census/2011/ks102ew
+# import the new table with age data
+data <- ingest("ks102ew", geographytype)
 # rewriting as a function for the median age only
 age_predictors <- function(data){
   age <- data %>%
@@ -373,6 +393,12 @@ age_predictors <- function(data){
            "age_median" = "Age: Median Age; measures: Value") %>% select(geo_code, all_residents, age_median)
   save(age, file='rda/age.rda')
 }
+#running the function on the data set
+age_predictors(data)
+#adding to main data set
+load('rda/age.rda')
+data_set <- data_set %>%
+  left_join(age)
 ```
 
 
@@ -424,6 +450,11 @@ Table: Ethnicity features and census categories
 After this aggregation, the numbers of residents were divided by the sums of the rows, to have a normalised value for each of the ethnicities, as a ratio of the residents in the area.  This created long code to tidy and aggregate the data, as below.
 
 ```{r create the ethnicity function, eval=FALSE}
+# next to load in the ethnicity data
+# https://www.nomisweb.co.uk/census/2011/lc2101ew
+# updating with age and ethnicity
+nomis_census_csv("lc2101ew", geographytype)
+data <- ingest("lc2101ew", geographytype)
 # creating a function for repeatability
 ethnicity_predictors <- function(data){
   print("manipulating raw data")
@@ -477,82 +508,261 @@ ethnicity_predictors <- function(data){
   print("saving the file")
   save(ethnicity, file='rda/ethnicity.rda')
 }
+#running the function on the data set
+ethnicity_predictors(data)
+#adding to main data set
+load('rda/ethnicity.rda')
+data_set <- data_set %>%
+  left_join(ethnicity)
+names(data_set)
 ```
 
 
 ### Sex/gender feature in the working age population
 
-Earlier I created a feature for sex/gender, but that was for the full population, and I think it would be better to create one for working age, which I will do here.Here I am intending to create a new female ratio, using the same 25 to 64 group as for ethnicities, and also using the same source data.
+The earlier feature for sex/gender was the ratio for the full population, but the data should be consistent, and therefore use the same 25 to 64 group as for ethnicity feature.  This can be carried out using the same source data tables.
 
 ```{r sex gender feature creation, eval=FALSE}
 # next to load in the sex/gender data, for ages 25 to 64 
 # https://www.nomisweb.co.uk/census/2011/lc2101ew
 # using the ethnicity data, which includes gender
 data <- ingest("lc2101ew", geographytype)
-#creating the raw file
-sex_25_64 <- data %>%
-  #filtering all ethnicities
-  select(contains("Ethnic Group: All categories:") | 
-           contains("geography code") ) %>%
-  #filtering to the age groups in question
-  select(contains("Age 25 to 49") | 
-           contains("Age 50 to 64") | 
-           contains("geography code") ) %>%
-  #mutate to create the sums for comparison
-  rowwise() %>%
-  mutate("all_25_64"= sum(across(contains("Sex: All Persons")))) %>%
-  mutate("female_25_64"= sum(across(contains("Sex: Female")))) %>%
-  mutate("male_25_64"= sum(across(contains("Sex: Males")))) %>%
-  mutate("checksum" = female_25_64 + male_25_64) %>%
-  mutate(female_ratio_25_64 = female_25_64/all_25_64)%>% 
-  rename("geo_code" = "geography code") 
-#limit to the two columns necessary
-sex_25_64 <- sex_25_64 %>%
-  select(contains("female_ratio_25_64") | contains("geo_code") )
+#creating as a function for reuse
+sex_predictors <- function(data){
+  sex_25_64 <- data %>%
+    select(contains("Ethnic Group: All categories:") | 
+             contains("geography code") ) %>%
+    select(contains("Age 25 to 49") | 
+             contains("Age 50 to 64") | 
+             contains("geography code") ) %>%
+    rowwise() %>%
+    #create the ratio necessary
+    mutate(female_ratio_25_64 = sum(across(contains("Sex: Female"))) / 
+             sum(across(contains("Sex: All Persons")))) %>%
+    rename("geo_code" = "geography code")  %>%
+    select(contains("female_ratio_25_64") | contains("geo_code") )
+  save(sex_25_64, file='rda/sex_25_64.rda')
+}
+#running the function on the data set
+sex_predictors(data)
+#adding to main data set
+load('rda/sex_25_64.rda')
+data_set <- data_set %>%
+  left_join(sex_25_64)
+# show the data set values
+names(data_set)
 ```
 
-This reduces the ratio a little, still in favour of women but less so, presumably due to women living longer.  This will be the ratio used as a predictor, and I have deleted the other one.
+This reduces the ratio a little, still in favour of women but less so, presumably due to women living longer.
+
 
 ### Qualification feature
 
-Using the same methodology as before, with the new table including ages, limiting to 25 to 64, and normalising for each geo area.
+Using the same methodology as before, ratios for each qualification type as a proportion of the 25 to 64 aged residents in each geo area were created.  The census qualification categories were used, as follows, a total of 8:
+
+* No qualifications;
+* Level 1: 1-4 O Levels/CSE/GCSEs (any grades), Entry Level, Foundation Diploma, NVQ Level 1, Foundation GNVQ, Basic/Essential Skills;
+* Level 2: 5+ O Level (Passes)/CSEs (Grade 1)/GCSEs (Grades A*-C), School Certificate, 1 A Level/ 2-3 AS Levels/VCEs, Intermediate/Higher Diploma, Welsh Baccalaureate Intermediate Diploma, NVQ level 2, Intermediate GNVQ, City and Guilds Craft, BTEC First/General Diploma, RSA Diploma;
+* Apprenticeship;
+* Level 3: 2+ A Levels/VCEs, 4+ AS Levels, Higher School Certificate, Progression/Advanced Diploma, Welsh Baccalaureate Advanced Diploma, NVQ Level 3; Advanced GNVQ, City and Guilds Advanced Craft, ONC, OND, BTEC National, RSA Advanced Diploma;
+* Level 4 and above: Degree (for example BA, BSc), Higher Degree (for example MA, PhD, PGCE), NVQ Level 4-5, HNC, HND, RSA Higher Diploma, BTEC Higher level, Foundation degree (NI), Professional qualifications (for example teaching, nursing, accountancy);
+* Other qualifications: Vocational/Work-related Qualifications, Foreign Qualifications (not stated/level unknown).
+
+Source https://www.nomisweb.co.uk/census/2011/lc5102ew, clicking on the "Highest level of qualification" link.
+
+```{r create the qualification features, eval=FALSE}
+# qualifications
+# https://www.nomisweb.co.uk/census/2011/lc5102ew
+# import the new table with qualifications
+nomis_census_csv("lc5102ew", geographytype)
+data <- ingest("lc5102ew", geographytype)
+names(data)
+#creating a function for repeatability
+qualifications_predictors <- function(data){
+  qualifications_raw <- data %>%
+    #save only the 25 to 64 years
+    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+    rename("geo_code" = "geography code") %>%
+    #calculate the sums for the retained predictors
+    rowwise() %>%
+    mutate("all_qual_25_64"= sum(across(contains("All categories: ")))) %>%
+    mutate("no_qual_25_64"= sum(across(contains("No qualifications")))) %>%
+    mutate("level1_25_64"= sum(across(contains("Level 1 qualification")))) %>%
+    mutate("level2_25_64"= sum(across(contains("Level 2 qualification")))) %>%
+    mutate("level3_25_64"= sum(across(contains("Level 3 qualification")))) %>%
+    mutate("level4_25_64"= sum(across(contains("Level 4 qualification")))) %>%
+    mutate("other_qual_25_64"= sum(across(contains("Other qualifications")))) %>%
+    mutate("apprentice_25_64"= sum(across(contains("Apprenticeship")))) %>%
+    select( contains("geo_code") | contains("25_64"))
+  # normalise per area
+  qualifications <- sweep(qualifications_raw[,3:9], 1, rowSums(qualifications_raw[,3:9]), FUN = "/")  %>%
+    cbind(qualifications_raw[,1])
+  #save file
+  save(qualifications, file='rda/qualifications.rda')
+}
+#running the function on the data set
+qualifications_predictors(data)
+#adding to main data set
+load('rda/qualifications.rda')
+data_set <- data_set %>%
+  left_join(qualifications)
+names(data_set)
+```
 
 
 ### Marital status feature
 
-Using the same methodology as before, with the new table including ages, limiting to 25 to 64, and normalising for each geo area.
-https://www.nomisweb.co.uk/census/2011/lc1101ew
+Using the same methodology as before, rations of the 25 to 64 residents, and normalising for each geo area.
 
-The numbers in this section were significantly less than the other categories, maybe two thirds of the total, so this may not be a good measure, having some uncertainty around it.
+The total numbers in this section were significantly less than the other categories, maybe two thirds of the total, so this may not be a good measure, having some uncertainty around it.
+
+```{r creating the marital features, eval=FALSE}
+# next marital status
+# https://www.nomisweb.co.uk/census/2011/lc1101ew
+# import the new table with marital status
+nomis_census_csv("lc1101ew", geographytype)
+data <- ingest("lc1101ew", geographytype)
+#creating a function for repeatability
+marital_predictors <- function(data){
+  marital_raw <- data %>%
+    #only all genders
+    select(contains("Sex: All persons;") | contains("geography code")) %>%
+    #save only the 25 to 64 years
+    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+    rename("geo_code" = "geography code") %>%
+    #calculate for retained predictors
+    rowwise() %>%
+    mutate("all_marital_25_64"= sum(across(contains("All categories: ")))) %>%
+    mutate("single_25_64"= sum(across(contains("Marital Status: Single")))) %>%
+    mutate("married_25_64"= sum(across(contains("Marital Status: Married;")))) %>%
+    mutate("civil_25_64"= sum(across(contains("Marital Status: In a registered same-sex civil")))) %>%
+    mutate("separated_25_64"= sum(across(contains("Marital Status: Separated")))) %>%
+    mutate("divorced_25_64"= sum(across(contains("Marital Status: Divorced")))) %>%
+    mutate("widowed_25_64"= sum(across(contains("Marital Status: Widowed")))) %>%
+    select(contains("geo_code") | contains("25_64"))
+  # normalise per area
+  marital <- sweep(marital_raw[,3:8], 1, rowSums(marital_raw[,3:8]), FUN = "/")  %>%
+    cbind(marital_raw[,1])
+  save(marital, file='rda/marital.rda')
+}
+#running the function on the data set
+marital_predictors(data)
+#adding to main data set
+load('rda/marital.rda')
+data_set <- data_set %>%
+  left_join(marital)
+```
+
 
 ### Religion feature
 
-As before.
-https://www.nomisweb.co.uk/census/2011/lc2107ew
+As for the marital features.  There are a number of religions with a small number of people, and it may make sense to aggregate them in to "other".  Hoever, with the same cutoff of 0.5% as earlier, only one religion is summarised, "Jewish", therefor it can be left as it is.
 
-There are a number of religions with a small number of people.  It may make sense to aggregate them in to "other".  I will use the logic as before, with a cutoff of 0.5%, however, this leaves only "Jewish" being summarised, so I will leave as is.
+```{r creating the religion features, eval=FALSE}
+# next religion
+# https://www.nomisweb.co.uk/census/2011/lc2107ew
+# import the new table with religion
+nomis_census_csv("lc2107ew", geographytype)
+data <- ingest("lc2107ew", geographytype)
+#creating a function for repeatability
+religion_predictors <- function(data){
+  religion_raw <- data %>%
+    # all genders
+    select(contains("Sex: All persons;") | contains("geography code")) %>%
+    #select the working age only
+    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+    rename("geo_code" = "geography code") %>%
+    #calculate the sums across ages
+    rowwise() %>%
+    mutate("all_religion_25_64"= sum(across(contains("All categories:")))) %>%
+    mutate("christian_25_64"= sum(across(contains("Christian")))) %>%
+    mutate("buddhist_25_64"= sum(across(contains("Buddhist")))) %>%
+    mutate("hindu_25_64"= sum(across(contains("Hindu")))) %>%
+    mutate("jewish_25_64"= sum(across(contains("Jewish")))) %>%
+    mutate("muslim_25_64"= sum(across(contains("Muslim")))) %>%
+    mutate("sikh_25_64"= sum(across(contains("Sikh")))) %>%
+    mutate("other_25_64"= sum(across(contains("Other religion;")))) %>%
+    mutate("no_religion_25_64"= sum(across(contains("No religion;")))) %>%
+    mutate("religion_not_stated_25_64"= sum(across(contains("Religion not stated;")))) %>%
+    select(contains("geo_code") | contains("25_64"))
+  # normalise per area
+  religion <- sweep(religion_raw[,3:11], 1, rowSums(religion_raw[,3:11]), FUN = "/")  %>%
+    cbind(religion_raw[,1])
+  save(religion, file='rda/religion.rda')
+}
+#running the function on the data set
+religion_predictors(data)
+#adding to main data set
+load('rda/religion.rda')
+data_set <- data_set %>%
+  left_join(religion)
+```
 
 
 ### Household composition feature
 
-As before.
-https://www.nomisweb.co.uk/census/2011/lc1109ew
-
-In this case due to limitations in the data, the age included in the predictors are:
+In this case the 25 to 64 age group is not readily accessible, as the ages included in the predictors are:
 
 * Age 25 to 34
 * Age 35 to 49
 * Age 50 and over
 
-However, there is a subset which is called "One person household: Aged 65 and over" and "One family only: All aged 65 and over", which can be subtracted from the "Aged 50 and over" section.  Not perfect as households will have a mixture of ages but an improvement to make the predictor closer to be relevant to the predictions.
+There is a subset which is called "One person household: Aged 65 and over" and "One family only: All aged 65 and over", which can be subtracted from the "Aged 50 and over" section.  Not perfect as households will have a mixture of ages but an improvement to make the predictor closer to be relevant to the predictions and similar to the other features.
+
+```{r creating the household features, eval=FALSE}
+#next household composition
+# https://www.nomisweb.co.uk/census/2011/lc1109ew
+# import the new table with household
+nomis_census_csv("lc1109ew", geographytype)
+data <- ingest("lc1109ew", geographytype)
+names(data)
+# rerunning as a function for reuse
+household_predictors <- function(data){
+  household_raw <- data %>%
+    # retain only the all sex (not female or male)
+    select(contains("Sex: All persons;") | contains("geography code")) %>%
+    # retain only the specific age groups
+    select(contains("Age 25 to 34") | 
+             contains("Age 35 to 49") | 
+             contains("Age 50 and over") | 
+             contains("geography code")) %>%
+    rename("geo_code" = "geography code") %>%
+    # retain the totals, the total amount, and the over 65 columns
+    select(contains("geo_code") | 
+             contains("All categories: Household composition") | 
+             contains(": Total") | 
+             contains("ged 65 and over")) %>%
+    rowwise() %>%
+    # combine the age categories to create the predictors
+    mutate("all_household_25_64"= sum(across(contains("All categories:"))) -
+             sum(across(contains("One person household: Aged 65 and over"))) -
+             sum(across(contains("One family only: All aged 65 and over")))) %>%
+    mutate("oneperson_25_64"= sum(across(contains("One person household: Total"))) -
+             sum(across(contains("One person household: Aged 65 and over")))) %>%
+    mutate("marriedfamily_25_64"= sum(across(contains("Married")))) %>%
+    mutate("cohoabiting_25_64"= sum(across(contains("Cohabiting")))) %>%
+    mutate("loneparent_25_64"= sum(across(contains("Lone parent")))) %>%
+    mutate("otherhousehold_25_64"= sum(across(contains("Other household types: Total")))) %>%
+    select(contains("geo_code") | contains("25_64")) %>%
+    mutate(checksum_all = sum(across(contains("25_64"))) - all_household_25_64, .after = geo_code)
+  # normalise per area
+  household <- sweep(household_raw[,4:8], 1, rowSums(household_raw[,4:8]), FUN = "/")  %>%
+    cbind(household_raw[,1])
+  save(household, file='rda/household.rda')
+}
+#running the function on the data set
+household_predictors(data)
+#adding to main data set
+load('rda/household.rda')
+data_set <- data_set %>%
+  left_join(household)
+```
+
 
 
 ### Industry feature
 
-As before.
-https://www.nomisweb.co.uk/census/2011/lc6110ew
-
-This is straightforward.  The list of the industries is as follows, which may be useful for later, for intuition tells you that some industries may be more favourable for managerial or professional roles than others:
+This used the same methodology as before, with the categories retained from the census.  A summary list of the industries is as follows:
 
 * A, B, D, E Agriculture, energy and water
 * C Manufacturing
@@ -563,14 +773,50 @@ This is straightforward.  The list of the industries is as follows, which may be
 * O,P,Q Public administration, education and health
 * R,S,T,U Other
 
+```{r creating the industry features, eval=FALSE}
+#next Industry
+# https://www.nomisweb.co.uk/census/2011/lc6110ew
+# import the new table with Industry
+nomis_census_csv("lc6110ew", geographytype)
+data <- ingest("lc6110ew", geographytype)
+names(data)
+# rerunning as a function for reuse
+industry_predictors <- function(data){
+  industry_raw <- data %>%
+    # retain only the specific age groups
+    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+    rename("geo_code" = "geography code") %>%  
+    # combine the age categories to create the predictors
+    rowwise() %>%
+    mutate("all_industry_25_64"= sum(across(contains("All categories:")))) %>%
+    mutate("industry_abde_25_64"= sum(across(contains("Industry: A, B, D, E ")))) %>%
+    mutate("manufacturing_25_64"= sum(across(contains("Manufacturing")))) %>%
+    mutate("construction_25_64"= sum(across(contains("Construction")))) %>%
+    mutate("industry_gi_25_64"= sum(across(contains("Industry: G, I")))) %>%
+    mutate("industry_hj_25_64"= sum(across(contains("Industry: H, J ")))) %>%
+    mutate("industry_klmn_25_64"= sum(across(contains("Industry: K, L, M, N")))) %>%
+    mutate("industry_opq_25_64"= sum(across(contains("Industry: O, P, Q ")))) %>%
+    mutate("Industry_rstu_25_64"= sum(across(contains("Industry: R, S, T, U ")))) %>%
+    select(contains("geo_code") | contains("25_64")) %>%
+    mutate(checksum_all = sum(across(contains("25_64"))) - all_industry_25_64, .after = geo_code)
+  # normalise per area
+  industry <- sweep(industry_raw[,4:11], 1, rowSums(industry_raw[,4:11]), FUN = "/")  %>%
+    cbind(industry_raw[,1]) 
+  save(industry, file='rda/industry.rda')
+}
+
+#running the function on the data set
+industry_predictors(data)
+#adding to main data set
+load('rda/industry.rda')
+data_set <- data_set %>%
+  left_join(industry)
+```
+
 
 ### Country of birth feature
 
-As before.
-https://www.nomisweb.co.uk/census/2011/lc2103ew
-https://www.nomisweb.co.uk/census/2011/qs203ew
-
-This data set is complex with many overlapping categories, for example:
+The methodology is as before, but the data set is complex with many overlapping categories, for example:
 
 * Other Europe: Total
 * Other Europe: EU countries: Total
@@ -578,7 +824,7 @@ This data set is complex with many overlapping categories, for example:
 * Other Europe: EU countries: Accession countries April 2001 to March 2011
 * Other Europe: Rest of Europe
 
-The following were retained, combining the Ireland values with the rest of the EU, as there were not so many people:
+The following were the categories used for features, again selecting by sizes of populations, and using the aggregation from the census data.  One difference was that the Ireland category was combined with the rest of the EU, as there were not so many people:
 
 * Europe: United Kingdom: Total
 * Europe: Other Europe: EU countries: Member countries in March 2001
@@ -589,19 +835,246 @@ The following were retained, combining the Ireland values with the rest of the E
 * The Americas and the Caribbean
 * Antarctica, Oceania (including Australasia) and other
 
+```{r creating the country of birth features, eval=FALSE}
+# next country of birth
+# https://www.nomisweb.co.uk/census/2011/lc2103ew
+# import the new table with country of birth
+nomis_census_csv("lc2103ew", geographytype)
+data <- ingest("lc2103ew", geographytype)
+names(data)
+# running as a function for reuse
+country_predictors <- function(data){
+  country_raw <- data %>%
+    # retain only the all sex (not female or male)
+    select(contains("Sex: All persons;") | contains("geography code")) %>%
+    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+    rename("geo_code" = "geography code") %>%
+    # combine the age categories to create the predictors
+    rowwise() %>%
+    mutate("all_country_25_64"= sum(across(contains("All categories:")))) %>%
+    mutate("uk_25_64"= sum(across(contains("United Kingdom: Total")))) %>%
+    mutate("eu_2001_25_64"= sum(across(contains("Other Europe: EU countries: Member countries in March 2001"))) + sum(across(contains("Europe: Ireland")))) %>%
+    mutate("eu_rest_25_64"= sum(across(contains("Other Europe: EU countries: Accession countries April 2001 to March 2011"))) ) %>%
+    mutate("europe_rest_25_64"= sum(across(contains("Other Europe: Rest of Europe")))) %>%
+    mutate("africa_25_64"= sum(across(contains("Africa")))) %>%
+    mutate("me_asia_25_64"= sum(across(contains("Middle East and Asia")))) %>%
+    mutate("americas_25_64"= sum(across(contains("The Americas and the Caribbean")))) %>%
+    mutate("other_country_25_64"= sum(across(contains("Antarctica, Oceania (including Australasia) and other")))) %>%
+    select(contains("geo_code") | contains("25_64")) %>%
+    mutate(checksum_all = sum(across(contains("25_64"))) - all_country_25_64, .after = geo_code)
+  # normalise per area
+  country <- sweep(country_raw[,4:11], 1, rowSums(country_raw[,4:11]), FUN = "/")  %>%
+    cbind(country_raw[,1])
+  save(country, file='rda/country.rda')
+}
+#running the function on the data set
+country_predictors(data)
+#adding to main data set
+load('rda/country.rda')
+data_set <- data_set %>%
+  left_join(country)
+```
+
 
 ### Creating repeatable functions
 
-The code is intended to support different area sizes, and therefore repeatable functions were created, as shown earlier, taking in various geography tables as input.
+The code is intended to support different area sizes, and therefore repeatable functions were created to create each set of features from the tables, as shown in the earlier section.
 
-This was confirmed by running the functions and comparing against the data set when run as separate commands, using the regional data for ease of handling.
+The results were confirmed by running the functions and comparing against the data set when run as separate commands, using the regional data for ease of handling.  The full code includes both variants of the feature creation.
 
-Next the functions were then applied to the middle layer super output areas (MSOA), which produced a data set of 7201 observations with 62 variables, of which two are the name and the code for the area, and one is the $y$, the ratio of people in managerial and professional occupations.  This file when saves as an R object is 3MB.
+Then code was developed to carry out the full creation of the data set.  Firstly, all necessary tables for a given geographic area are downloaded from Nomis.
+
+```{r download all the tables necessary, eval= FALSE}
+####### repeatable code ##########
+# geographytype <- "TYPE480" #regions
+# geographytype <- "TYPE297" #super output areas - middle layer
+# nomis_census_csv(censusdata, geographytype)
+
+#creating list of census tables to take
+censusdata_list <- c("ks608ew", "ks102ew", "lc2101ew", "lc2103ew","lc6110ew", "lc1109ew", "lc2107ew", "lc1101ew", "lc5102ew")
+
+#create a function to download all the tables in the list
+download_censusdata <- function(geotype, datalist){
+  # apply the list to download all of the data
+  tmp <- lapply(datalist, function(censusdata){
+    # pause for a few random seconds to avoid annoying nomis
+    time <- sample(4:17,1)
+    print(paste("pausing", time, "seconds"))
+    Sys.sleep(time)
+    print(paste("downloading geography area", geotype, "for table", censusdata))
+    #run the function to generate and download the file
+    nomis_census_csv(censusdata, geotype)
+  })
+  rm(tmp)
+}
+```
+
+The following code runs each of the feature functions in turn, appending to the data set until all the features are included.
+
+```{r function to create all the data sets, eval=FALSE}
+# function to load in the data for a given geotype
+import_data <- function(geotype){
+  print(paste("importing", geotype))
+  #load in occupation data
+  print(paste("loading occupation data"))
+  # https://www.nomisweb.co.uk/census/2011/ks608ew
+  # import the new table with occupation data
+  data <- ingest("ks608ew", geotype)
+  #running the function on the data set
+  occupation_target(data)
+  #adding to main data set
+  load('rda/occupation.rda')
+  data_set <- occupation
+  rm(occupation)
+  
+  # load in age data
+  print(paste("loading age data"))
+  # https://www.nomisweb.co.uk/census/2011/ks102ew
+  # import the new table with age data
+  data <- ingest("ks102ew", geotype)
+  #running the function on the data set
+  age_predictors(data)
+  #adding to main data set
+  load('rda/age.rda')
+  data_set <- data_set %>%
+    left_join(age)
+  rm(age)
+  
+  # next to load in the ethnicity data
+  print(paste("loading ethnicity data"))
+  # https://www.nomisweb.co.uk/census/2011/lc2101ew
+  # updating with age and ethnicity
+  data <- ingest("lc2101ew", geotype)
+  #running the function on the data set
+  ethnicity_predictors(data)
+  #adding to main data set
+  load('rda/ethnicity.rda')
+  data_set <- data_set %>%
+    left_join(ethnicity)
+  rm(ethnicity)
+  
+  # next to load in the sex/gender data, for ages 25 to 64 
+  print(paste("loading sex data"))
+  # https://www.nomisweb.co.uk/census/2011/lc2101ew
+  # using the ethnicity data, which includes gender
+  data <- ingest("lc2101ew", geotype)
+  #running the function on the data set
+  sex_predictors(data)
+  #adding to main data set
+  load('rda/sex_25_64.rda')
+  data_set <- data_set %>%
+    left_join(sex_25_64)
+  rm(sex_25_64)
+  
+  # qualifications
+  print(paste("loading qualifications data"))
+  # https://www.nomisweb.co.uk/census/2011/lc5102ew
+  # import the new table with qualifications
+  data <- ingest("lc5102ew", geotype)
+  #running the function on the data set
+  qualifications_predictors(data)
+  #adding to main data set
+  load('rda/qualifications.rda')
+  data_set <- data_set %>%
+    left_join(qualifications)
+  rm(qualifications)
+  
+  # next marital status
+  print(paste("loading marital data"))
+  # https://www.nomisweb.co.uk/census/2011/lc1101ew
+  # import the new table with marital
+  data <- ingest("lc1101ew", geotype)
+  #running the function on the data set
+  marital_predictors(data)
+  #adding to main data set
+  load('rda/marital.rda')
+  data_set <- data_set %>%
+    left_join(marital)
+  rm(marital)
+  
+  # next religion
+  print(paste("loading religion data"))
+  # https://www.nomisweb.co.uk/census/2011/lc2107ew
+  # import the new table with religion
+  data <- ingest("lc2107ew", geotype)
+  #running the function on the data set
+  religion_predictors(data)
+  #adding to main data set
+  load('rda/religion.rda')
+  data_set <- data_set %>%
+    left_join(religion)
+  rm(religion)
+  
+  #next household composition
+  print(paste("loading household data"))
+  # https://www.nomisweb.co.uk/census/2011/lc1109ew
+  # import the new table with household
+  data <- ingest("lc1109ew", geotype)
+  #running the function on the data set
+  household_predictors(data)
+  #adding to main data set
+  load('rda/household.rda')
+  data_set <- data_set %>%
+    left_join(household)
+  rm(household)
+  
+  #next Industry
+  print(paste("loading industry data"))
+  # https://www.nomisweb.co.uk/census/2011/lc6110ew
+  # import the new table with Industry
+  data <- ingest("lc6110ew", geotype)
+  #running the function on the data set
+  industry_predictors(data)  
+  #adding to main data set
+  load('rda/industry.rda')
+  data_set <- data_set %>%
+    left_join(industry)
+  rm(industry)
+  # names(data_set)
+  
+  # next country of birth
+  print(paste("loading country data"))
+  # https://www.nomisweb.co.uk/census/2011/lc2103ew
+  # import the new table with country of birth
+  data <- ingest("lc2103ew", geotype)
+  #running the function on the country of birth data set
+  country_predictors(data)
+  #adding to main data set
+  load('rda/country.rda')
+  data_set <- data_set %>%
+    left_join(country)
+  rm(country, data)
+  
+  #save the data set
+  filename <- paste("data_set", geotype, sep = "_") %>%
+    paste0(., ".rda")
+  destfile <- paste0("rda/", filename)
+  print(paste("saving", destfile))
+  save(data_set, file=destfile)
+  #clean up
+  rm(filename, destfile)
+  return(data_set)
+}
+```
+
+With the creation of these functions, the creation of the full data set for the middle layer super output areas (MSOA) is three lines, as below.
+
+This produced a data set of 7201 observations with 62 variables, of which two are the name and the code for the area, and one is the $y$, the ratio of people in managerial and professional occupations.  This file when saves as an R object is 3MB.
+
+```{r create the MSOA raw data set, eval=FALSE}
+#creating list of census tables to take
+censusdata_list <- c("ks608ew", "ks102ew", "lc2101ew", "lc2103ew","lc6110ew",
+                     "lc1109ew", "lc2107ew", "lc1101ew", "lc5102ew")
+# run the function to download the csv files
+download_censusdata("TYPE297", censusdata_list)
+# run the function on the MSOA imported data
+data_set <- import_data("TYPE297")
+```
 
 
 ## Create main set and validation data set 
 
-I created a validation set of 10% which will be saved and removed while I carry out the modelling.
+A validation set of 10% was created and saved for later, with the next phase of modelling being carried out on the retained "main" set.
 
 ```{r create main and validation set, message=FALSE, warning=FALSE}
 # load the MSOA raw data from file
@@ -619,7 +1092,7 @@ validation <- data_set[test_index,]
 
 The Middle layer Super Output Areas (MSOA), for England and Wales is a data set of 7201 observations with 62 variables, of which two are the name and the code for the area, the key, one is the outcome $y$, so 59 potential features/predictors.
 
-Two of the variables relate to the size of the area.  This is potentially interesting for comparison between the data sets, but I don't believe that they should be a feature predicting the outcome, as it is a function of the data capture.  The ratio of people in the "occupation" category may have some predicability, but not the total size.
+Two of the variables relate to the size of the area.  This is potentially interesting for comparison between the data sets, but not for predicting the outcome, as it is a function of the data capture.  The ratio of people in the "occupation" category may have some predictability, but not the total size.
 
 Similarly the "geo_code" is a key to link the data together.  In addition, it does relate to the wider region, and it is likely that some regions of the UK have more senior roles present than others.  There is a discussion at policy and political levels of left behind areas, and this may be a useful predictor.  Therefore the data can be augmented with the geographic areas, replacing the "geo_name"
 
@@ -630,9 +1103,8 @@ table(main$geo_type)
 ```
 
 
-The outcome $y$ is the proportion of occupied people in the area in Managerial or Professional roles.
 
-Following is the graph of the distribution, which is not a normal distribution with a clear skew towards zero.
+Following is the graph of the distribution of the outcome $y$, the proportion of residents in the area with Managerial or Professional occupation.  This is not a normal distribution with a clear skew towards zero.
 
 ```{r histogram of the outcome y}
 #make the occupation in an area a ratio
@@ -645,8 +1117,8 @@ main %>%  ggplot(aes(y))  +
   xlab("y, proportions of people in managerial or professional occupations") +
   ylab("count of numbers of MSOA areas")
 ```
-
-Here is the mean, maximum and minimum, which shows a decent spread.
+ 
+The mean, maximum and minimum show a decent spread.
 
 ```{r key data for the outome, message=FALSE, warning=FALSE}
 #table of key data points
@@ -670,7 +1142,7 @@ main %>%  ggplot(aes(all_residents))  +
   ylab("count of numbers of MSOA areas")
 ```
 
-Similarly for the table of information for the sizes.
+This is also reflected in the table of information for the sizes.
 
 ```{r key data for the size, warning=FALSE, message=FALSE}
 #table of key data points of the sizes of the areas
@@ -686,7 +1158,7 @@ main %>% group_by(geo_type) %>%
 
 Now looking at the features, aside from the median age, the others are proportions of the people aged 25 to 64 in an area.  Making a boxplot of those proportions, if can be seen that a few are very high and a few very low.  Of the ones with high proportions - UK nationals and White UK ethnicity, not surprising, but there are areas with much lower values to below 25%.  On the other hand, there are a number with low values for all areas, which may indicate that they are not useful features.
 
-```{r box plots of features}
+```{r box plots of features, fig.height=4}
 #looking at the features
 #box plot 
 #create a "tidy" long form version for the ggplot 
@@ -702,7 +1174,7 @@ main_tidy <- main %>%
 main_tidy %>%
   ggplot(aes(x=reorder(feature, proportion, FUN=mean), y=proportion))  + 
   geom_boxplot() +
-  ggtitle("Boxplot of feature values- proportion of 25 to 64 in the area") +
+  ggtitle("Boxplot of feature values - proportion of 25 to 64 in the area") +
   ylab("Feature value") + 
   xlab("Features, reordered by mean") + 
   theme(axis.text.x=element_text(angle = 90, hjust=1, vjust=0.5))
@@ -718,7 +1190,7 @@ main_tidy %>% group_by(feature) %>%
   knitr::kable(caption="Summary of features with low mean proportions")
 ```
 
-The actual selection of candidates for removing should be carried out with the training data, so I will carry that out in the next section.
+The actual selection of candidates for removing should be carried out with the training data, in the next section.
 
 
 ### Correlation between features
@@ -727,7 +1199,7 @@ There are a lot of features, there is almost certainly some duplication, for exa
 
 Using the caret packages, it can be seen that a number of the features are highly correlated with each other.
 
-```{r correlation image}
+```{r correlation image, fig.height=4}
 ### calculating the correlation between features
 correlationmatrix <- cor(main[,7:63])
 # image of correlation matrix
@@ -766,7 +1238,7 @@ main %>%  pivot_longer(
            c("white_uk_25_64", "me_asia_25_64", 
              "other_ethnicity_25_64", "other_qual_25_64")) %>%
   ggplot(aes(uk_25_64, proportion))  + 
-  geom_point() + 
+  geom_point(size=0.7) + 
   facet_grid(. ~feature) +
   ggtitle("Correlation of features") +
   xlab("proportion for 'uk_25_64' feature") +
@@ -778,19 +1250,19 @@ As earlier, any decisions on features to remove or not should be made with the t
 
 ### Geographic distribution
 
-The output area (OA) maps to the Lower layer Super Output Area (LSOA), on to the  Middle Super Output Area (LSOA), and finally on to the Local Authority Districts (LAD).  There may be some geographic influence, maybe the roles being in a certain place, and therefore I intend to create a feature for use from that, although it could be correlated with other features.
+There may be some geographic influence, maybe the roles being in a certain place, and therefore a feature would be useful.  This section describes how the information on the locations and used to create a number of features relating to the geography.
 
-The information is described here:
+The super output area (SOA) maps to the Lower layer Super Output Area (LSOA), on to the  Middle Super Output Area (LSOA), and finally on to the Local Authority Districts (LAD).  The detail of the mapping is described here:
 
 * https://census.ukdataservice.ac.uk/use-data/guides/boundary-data.aspx
 * https://www.ons.gov.uk/methodology/geography/ukgeographies/censusgeography#output-area-oa 
 * Geo mapping http://geoconvert.ukdataservice.ac.uk/
 * https://borders.ukdataservice.ac.uk/easy_download.html
 
-There is a lookup file provided which I will use to include the feature.  
+There is a lookup file provided which can be used to create the location feature. 
 https://borders.ukdataservice.ac.uk/lut_download_data.html?data=oa11_lsoa11_msoa11_lad11_ew_lu.
 
-Following is the code to carry out the mapping, which groups the over 7000 MSOAs and 130000 SOAs in to 348 local areas.
+Following is the code to carry out the mapping, which downloads the file, and then creates a lookup file between the area codes and the local areas, including over 7000 MSOAs and 130000 SOAs mapped to 348 local areas, with the area codes changed to be numerical rather than characters.
 
 ```{r adding the local area, eval=FALSE}
 # getting the mapping for the locations
@@ -806,7 +1278,7 @@ geo_mapping <-
 save(geo_mapping, file='rda/geo_mapping.rda')
 head(main$geo_code, 20)
 head(geo_mapping)
-# for the columns of interest are MSOA11CD (MSOA), OA11CD (SOA) and LAD11CD
+# the columns of interest are MSOA11CD (MSOA), OA11CD (SOA) and LAD11CD
 load("rda/geo_mapping.rda")
 geo_lookup <- geo_mapping %>%
   #for the MSOA and SOA
@@ -818,6 +1290,7 @@ head(geo_lookup)
 # I need to convert the character strings to numbers, so remove the "E"
 # calculating a list of strings within the local area to be rewritten as numbers
 # keeping the strings replaced as long as possible for smaller area_code
+# retaining a 3 digit long area code
 area_update <- levels(as.factor(str_sub(geo_lookup$local_area, 1, -3)))
 #create a new column to be updated
 geo_lookup <- geo_lookup %>%
@@ -840,12 +1313,12 @@ length(levels(as.factor(geo_mapping$local_area)))
 head(levels(as.factor(geo_mapping$local_area)))
 ```
 
-This will only work if the algorithms treat the number representing the geographic area as a category variable - if it treats it as a continuous variable than it will not work, as the numbers are unrelated to underlying distributions.  A better way to do this would be to create a feature per region, and then give a 1 or 0 as to whether the MSOA/SOA is in that region.
+This will only be useful if the algorithms treat the number representing the geographic area as a category variable - the numbers are unrelated to underlying distributions and will not contain information if it is treated it as a continuous variable.  A better way to do this would be to create a feature per region, and then give a 1 or 0 as to whether the MSOA/SOA is in that region.
 
-This would be unwieldy with hundreds of areas as columns, and so we need to summarise.  There is a lookup from the local area (LAD) to a smaller number of regions in England (Wales is effectively a single region), as described here.
+This would be unwieldy with hundreds of areas as columns, and so the regions need to be larger.  There is a further lookup from the local area (LAD) to a smaller number of regions in England (Wales is effectively a single region), as described here.
 https://geoportal.statistics.gov.uk/datasets/local-authority-district-to-region-december-2018-lookup-in-england
 
-This lookup is then used to can use this to create a further lookup to a specific region, which is in turn used to create columns.  I will use names for ease of understanding, and add to the geo_lookup created earlier.
+This lookup is then used to can use this to map each SOA/MSOA/LAD a specific region, which is in turn used to create columns.  The region names are used, added to the geo_lookup created earlier, via an interim "region_lookup" file.  Note that the MSOA in Wales had blank region names, and much of the complexity below is to add the wales name in, and to deal with a blank line in data.
 
 ```{r create region columns, eval=FALSE}
 # in addition creating a column per region
@@ -856,15 +1329,15 @@ download.file(geo_url, 'data/0aac9db88cbb4f8d9db42ad20b03cb71_0.csv')
 # load in file
 region_mapping<- read.csv('data/0aac9db88cbb4f8d9db42ad20b03cb71_0.csv')
 save(region_mapping, file='rda/region_mapping.rda')
-head(region_mapping)
-levels(as.factor(region_mapping$RGN11NM))
-load('rda/region_mapping.rda')
+save(region_mapping, file='rda/region_mapping.rda')
 #checking the data
+# load('rda/region_mapping.rda')
+head(region_mapping)
 levels(as.factor(region_mapping$RGN11NM))
 # some have empty region name
 # visual inspection shows that the unnamed regions are all Wales
 # and the local area ids start with "W"
-#there is a blank, for row 1, to be investigated
+# there is a blank, for row 1, to be investigated
 region_mapping %>%
   select(LAD11NM, LAD11CD, RGN11NM) %>%
   filter(RGN11NM == "") %>% unique()
@@ -876,16 +1349,19 @@ region_lookup <- region_mapping %>%
   rename(local_area = LAD11CD, region = RGN11NM) %>%
   select(local_area, region) %>%
   unique()
+# check the regions, showing the blank
 levels(as.factor(region_lookup$region))
 head(region_lookup)
-# update empty fields to be "wales"
-# not using this as it matches the isles of scilly as well
-# index <- str_length(region_mapping$region) == "0"
+# update empty fields to be "wales", where the local area starts with "W0"
+# create an index of areas starting with W
 index <- str_which(region_lookup$local_area, "W0")
+# confirm it works
 region_lookup[index,]
+# add wales to the region column for those areas
 region_lookup$region[index] <- "wales"
+# check the regions, now including wales
 levels(as.factor(region_lookup$region))
-#removing the blank line
+#removing the blank line (Isles of Scilly)
 region_lookup <- region_lookup %>%
   filter(region != "")
 #confirm that the regions are now correct
@@ -898,15 +1374,22 @@ region_lookup$region <- str_replace_all(region_lookup$region, " ", "_")
 levels(as.factor(region_lookup$region))
 #create a list of regions
 region_list <- unique(region_lookup$region)
-#create a table, with a column per region
+# create a table, with a column per region
+# looping through, for each name in the region list
+# if it matches the region assign a 1 
 region_table <- sapply(region_list, function(region){
   ifelse(str_detect(region_lookup$region, region), 1, 0)
 })
-head(region_table)
+# checking it works as intended
+head(region_table, 20)
 head(region_lookup, 20)
+tail(region_table, 20)
+tail(region_lookup, 20)
+# adding the columns to the region lookup
 region_lookup <- region_lookup %>% cbind(as.data.frame(region_table))
 # save completed lookup for later
 save(region_lookup, file='rda/region_lookup.rda')
+# checking
 head(region_lookup, 50)
 tail(region_lookup, 20)
 head(geo_lookup)
@@ -923,23 +1406,9 @@ head(geo_lookup)
 length(levels(as.factor(geo_lookup$area_code)))
 #tidy up
 save(geo_lookup, file='rda/geo_lookup.rda')
-
-# load("rda/main.rda")
-# load("rda/main_tidy.rda")
-load("rda/geo_lookup.rda")
-#add to the data set
-main_new <- geo_lookup %>%
-  mutate(geo_code=geo_code_msoa) %>%
-  select(-geo_code_soa) %>% 
-  unique() %>%
-  right_join(main) %>%
-  select(-local_area, -geo_code_msoa)
-#number of local areas
-print("number of local areas")
-length(levels(as.factor(main_new$area_code)))
 ```
 
-Finally a graph to see if there is regional variation.  I think it is possible to see that for the areas with higher proportion of managerial and professional roles, they tend to be in Lond and the South East.
+Finally a graph to see if there is regional variation.  The areas with higher proportion of managerial and professional roles tend to be in London and the South East.
 
 ```{r histogram of managerial and professional by region, message=FALSE}
 #a quick visual check to see whether regions are relevant
@@ -970,7 +1439,7 @@ geo_lookup %>%
 This leads to the following insight and recommendations:
 
 * create ratio of occupied/all residents
-* create local area feature, both numeric and regional columns
+* create local area feature, both numeric and columns for regions
 * remove occupation & all_residents population numbers, geo name  & geo type
 * some features have little variation, and could be removed if needed
 * some features are highly correlated and could be removed if needed
@@ -978,7 +1447,7 @@ This leads to the following insight and recommendations:
 
 ## Creating training and test data sets
 
-I created a training and test set for the modelling phase, in the same way as before, 10% of the data.
+From the "main" data set a training and test set was created for the modelling phase, in the same way as before, 10% of the data.
 
 ```{r creating train and test data sets, warning=FALSE}
 # test set will be 10% of the data
@@ -994,10 +1463,10 @@ test_set <- main[test_index,]
 The final test and training data for the modelling was created with a function which can later be run on the main/validation data prior to the final result creation.  The following was carried out:
 
 * create ratio of occupied/all
-* create local area feature
+* create geographic area features
 * remove occupation & all_residents population numbers, geo name  & geo type
 
-In addition, I included some code to be able to handle the different geo types, the SOA and MSOA areas, as they require slightly different lookups for the geographic region.
+THe geographic features were created using the lookup prepared in the previous section.  In addition, the below includes if" statements to be able to handle the different area types, the SOA and MSOA, as they require slightly different lookups for the geographic region.
 
 ```{r function to clean the data for modelling, message=FALSE, warning=FALSE}
 load("rda/geo_lookup.rda")
@@ -1022,11 +1491,15 @@ data_cleanse <- function(data_set_name, geosize){
       select(-geo_code_soa, -geo_code_msoa) %>%
       unique()
   }
-  # modify the data with the geo info
+  # modify the data
   tmp <- data_set_name %>%
+    # add the occupation ratio
     mutate(occ_ratio = occupation_all/all_residents, .after = all_residents) %>%
+    # remove the unnecessary columns
     select(-occupation_all, -all_residents, -geo_type, -geo_name) %>%
+    # add the geographic region columns
     left_join(geo_lookup) %>%
+    # remove the unnecessary geography columns
     select(-local_area, -geo_code)
   #return the new object
   return(tmp)
@@ -1052,11 +1525,11 @@ $y_n = \mu + \epsilon_n$
 
 where the random variation is represented by $\epsilon_n$, and $\mu$ is the average of all ratings.
 
-To calculate this, I estimated $\mu$ from the training data, with the following model:
+from the training data $\mu$ is estimated with the following model:
 
 $\hat{y_n} = \hat{\mu}$
 
-and applying to the test data gives a value of 0.09647.  I tested this, with a sequence around the $\hat{\mu}$ value, and this is the lowest RMSE for a single estimated figure.
+and applying to the test data gives a value of 0.09647.
 
 ```{r baseline RMSE}
 #load the test and train data
@@ -1073,13 +1546,15 @@ rmse_results <- tibble(method = "Mean of all locations", rmse = rmse_ave)
 rmse_results %>% knitr::kable(caption="Initial baseline RMSE on an SOA with a mean estimate")
 ```
 
-
+\newpage
 # Modelling
 
-As part of the modelling process, it is helpful to have smaller data sets to test models, and also to remove the potentially difficult to handle categorical data.  Then the algorithms can be tested quickly before trying on larger data sets.
+This section covers the machine learning modelling to develop the optimal model, and exploring the benefits of an ensemble model.  In addition, it covers selection of optimal features for the models, selection of models, and some visualisation of errors.
 
 
 ## Feature selection
+
+As part of the modelling process, it is helpful to have smaller data sets to test models, and also to remove the potentially difficult to handle categorical data.  Then the algorithms can be tested quickly before trying on larger data sets.
 
 From the earlier investigation, some features had low variability, and some were highly correlated, and these will be removed from the smaller training sets.
 
@@ -1128,7 +1603,7 @@ train_set_final %>%
 
 ### Categorical features
 
-Some algorithms do not handle categorical features well.  Although there is potentially usefule information, as in, there is an association between the categories and the outcome, it is not possibly to calculate a correlation where there are few values.  Therefore some algorithms will struggle, and therefore I will remove them initially, and then test and bring them in later.
+Some algorithms do not handle categorical features well.  Although there is potentially useful information, as in, there is an association between the categories and the outcome, it is not possibly to calculate a correlation where there are few values.  The training will use data sets without categorical features initially, and then test and bring them in later.
 
 ```{r list of categorical features}
 # categorical data
@@ -1142,13 +1617,14 @@ categorical_features <- names(geo_lookup[4:13])
 
 There are functions to calculate highly correlated features.
 
-```{r highly correlated features heatmap}
+```{r highly correlated features heatmap, fig.height=4}
+# load("rda/train_set_final.rda")
 correlationmatrix <- cor(train_set_final[,3:69])
 # image of correlation matrix
 heatmap(x = correlationmatrix, col = RColorBrewer::brewer.pal(11, "Spectral"))
 ```
 
-And this generates a short list of features to remove, with a cutoff of 0.8, which I illustrate with some more detail for a couple of them.
+This generates a short list of features to remove.  A cutoff of 0.8 was selected, with illustrations below.
 
 ```{r highly correlated feature list}
 # find attributes that are highly corrected
@@ -1166,7 +1642,7 @@ data.frame(correlationmatrix[,index][abs(correlationmatrix[,index]) > 0.7]) %>%
 
 ### Subset of data for initial testing
 
-The data set for training has 5832 observations of 70 variables.  We have the following features that can be removed with limited impact, or to avoid categorical issues, in addition to removing the "geo-code" column as it is neither a predictor nor outcome:
+The data set for training has 5832 observations of 70 variables.  Following are features that can be removed with limited impact, or to avoid categorical issues, in addition to removing the "geo-code" column as it is neither a predictor nor outcome:
 
 Table: List of features to be removed for the smaller data sets
 
@@ -1188,9 +1664,9 @@ Table: List of features to be removed for the smaller data sets
 |                    |married_25_64       |                 |
 |                    |hindu_25_64         |                 |
 
-I created with this input a new "train_small" with 5832 observations of 36 variables, 35 features and the outcome y.
+This was used to create a new "train_small" with 5832 observations of 36 variables: 35 features and the outcome y.
 
-And in addition, I created a further smaller still training set with 1000 observations and 15 features, chosen by sampling.
+And in addition, a further smaller training set was created with 1000 observations and 15 features, chosen by sampling.
 
 ```{r create smaller train sets, warning=FALSE}
 ## create smaller data set
@@ -1215,7 +1691,7 @@ index2 <- append(1, (index+1))
 train_smaller <- train_smaller[,index2]
 ```
 
-Due to some algorithms working or not working with categorical data, I have created another three training sets, small and smaller with categorical, and the full set without categorical data.
+In order to test the suitability of categorical data, a further three training sets were created, small and smaller with categorical, and the full set without categorical data.  This made 6 training sets in total, full, small and smaller, with and without categorical features.
 
 ```{r create categorical and no cotegorical training sets, warning=FALSE}
 # then the same but with categorical variables
@@ -1247,56 +1723,59 @@ train_final_nocat <- train_set_final %>%
 
 ## Model selection
 
-I will go through a number of model types, examples of families.
+This project will be using the caret package within R to carry out the machine learning, testing out the results on a number of models.  This section covers the selection of models to try out, the results per model and summarises the model performance. 
 
 This is a continuous rather than classification problem, therefore models suited to classification, such as Naive Bayes, Adaboost will not work.
 
 
 ### Machine learning families
 
-I have not found a definitive list of families, at least in part as there are many overlapping approaches, and it is a matter of opinion as to where algorithms fit.
+There are over a hundred different algorithms supported in the caret package, and instead of trying them all, examples of different types of models will be selected and tested, before focusing on the better performing types of models.
 
-I have used the following to try and structure the model selection, and choose a few from each grouping, and then focusing on the families that appear to be fruitful.
+The model selection was carried out by grouping in to families, choosing one or two from each grouping.  However, there does not appear to be a definitive list of algorithms and families, at least in part as there are many overlapping approaches.  Below are the groupings used (with the caret package name in lower case), it is a matter of opinion as to where some algorithms fit, but this is not critical as the aim is to select a breadth of model types.
 
 * Regression, regularisation
   + Linear Regression, Logistic Regression - glm
   + Generalized Additive Model using Splines - gam 
-  + Locally Estimated Scatterplot Smoothing (LOESS) gamLoess
-  + Least Absolute Shrinkage and Selection Operator (LASSO)
-  + Support Vector Machines (SVM) - svmLinear
+  + Locally Estimated Scatterplot Smoothing - gamLoess
+  + Least Absolute Shrinkage and Selection Operator - lasso
+  + Support Vector Machines (linear kernel) - svmLinear
   + Ridge regression
   + Boosted Generalized Linear Model - glmboost
 * Bayesian
   + Naive Bayes (classification)
-  + Bayesian Generalized Linear Model	bayesglm
-* Clustering, instance based, 
-  + k-Nearest Neighbor (kNN)
-  + Support Vector Machines (SVM) - svmLinear, svmRadial, svmRadialCost,  svmRadialSigma
-  + Learning Vector Quantization (LVQ) (classification)
+  + Bayesian Generalized Linear Model	- bayesglm
+* Clustering, instance based
+  + k-Nearest Neighbor - knn
+  + Support Vector Machines (other kernel) - svmLinear, svmRadial, svmRadialCost,  svmRadialSigma
+  + Learning Vector Quantization (classification)
   + k-Means
 * Trees /  forests / gradient boosting
-  + Classification and Regression Tree (CART) (rpart)
-  + Random Forest	(rf, ranger, rborist)
-  + Weighted Subspace Random Forest	wsrf
+  + Classification and Regression Tree - rpart
+  + Random Forest	- rf, ranger, rborist
+  + Weighted Subspace Random Forest	- wsrf
   + gradient boosting
-    ++ gbm
+    ++ Stochastic Gradient Boosting - gbm
     ++ xgboost
   + adaboost (classification)
 * Dimensionality reduction
-  + Principal Component Regression (PCR)
-  + Polynomial Kernel Regularized Least Squares krlsPoly
-  + Linear Discriminant Analysis (LDA) Classification
-  + Quadratic Discriminant Analysis (QDA) Classification
-* Artificial Neural Network Algorithms
-  + Multilayer Perceptrons (MLP)
+  + Principal Component Regression - pcr
+  + Polynomial Kernel Regularized Least Squares - krlsPoly
+  + Linear Discriminant Analysis (Classification)
+  + Quadratic Discriminant Analysis (Classification)
+* Artificial Neural Network Algorithms, deep learning
+  + Multilayer Perceptrons - mlp
   + Monotone Multi-Layer Perceptron Neural Network	monmlp
-  + Model Averaged Neural Network	avNNet
-  + Stochastic Gradient Descent
+  + Model Averaged Neural Network - avNNet
+
+This was developed with input from various sources online, but the following being most important:
+https://topepo.github.io/caret/train-models-by-tag.html
+https://machinelearningmastery.com/a-tour-of-machine-learning-algorithms/
 
 
 ### Modelling function
 
-I created a function to run the models without tuning, and store the data output in a list object, including the rmse.  This is then used through the rest of the modelling.
+A function was used to run the models without tuning, and store the data output in a list object, including the rmse.
 
 ```{r function to run the models}
 # creating a function to run the models with default settings
@@ -1339,7 +1818,7 @@ load("rda/train_set_final.rda")
 
 ### Generalized linear model - glm
 
-Starting with the GLM in the caret package, which is the same as the linear model, on the smallest training set, "train smaller" of 1000 by 15.
+Starting with the simplest model, a linear model, using the Generalized linear model in the caret package, initally on the smallest training set, "train smaller" of 1000 observations of 15 features.
 
 It takes no time, and gives a sensible order of importance for the variables, with "no qualification" first.  And it provides a significant improvement in the rmse.
 
@@ -1356,7 +1835,7 @@ importance <- varImp(result_glm_train_smaller$train, scale=FALSE)
 plot(importance, 10)
 ```
 
-Trying now with the next training set, the small set of 5832 by 35, this has another jump up in performance.  However there are a number of errors, although it worked, indicating some tuning opportunities.  The highest predictors are all qualifications, and then age.
+Increasing the size of the training set, the small set of 5832 by 35, with another jump up in performance.  However there are a number of errors, although it worked, indicating some tuning opportunities.  The highest predictors are all qualifications, and then age.
 
 ```{r glm with the small training set, eval=FALSE}
 # with the small train set
@@ -1384,7 +1863,7 @@ importance <- varImp(result_glm_train_final_nocat$train, scale=FALSE)
 plot(importance, 20)
 ```
 
-I checked again, and the glm model does work with the categorical data, with a small improvement in performance.
+The glm model does work with the categorical data, with a small improvement in performance.
 
 ```{r glm with categorical features, eval=FALSE}
 # test if it will work with categorical feature the the smaller_cat
@@ -1426,9 +1905,9 @@ The following were important features from the various versions of the model.
 * construction_25_64
 * eu_rest_25_64
 
-Here I plot the 9 most important features for GLM vs the outcome y, and visually you can see the link.
+Plotting the 9 most important features for GLM vs the outcome y, to visualise the links between the top features and the outcome, y, the proportion of residents with senior manager or professional occupation.
 
-```{r plots of important features vs y}
+```{r plots of important features vs y, fig.height=4}
 #plotting important features vs y
 important_features <- data.frame(importance$importance) %>%
   rownames_to_column(var="feature") %>%
@@ -1445,7 +1924,7 @@ train_set_final %>%
                values_to = "value") %>%
   filter(feature %in% important_features) %>% 
   ggplot(aes(y, value, col=feature))  + 
-  geom_point() +
+  geom_point(size=0.5) +
   facet_wrap(. ~feature,  scales = "free_y") +
   ggtitle("Outcome y for important features for GLM") +
   xlab("y, proportion of managerial & professional") +
@@ -1455,12 +1934,11 @@ train_set_final %>%
 
 ### K nearest neighbours - knn
 
-Starting with the k nearest neighbours model, a simple version of a cluster algorithm, KNN in the caret package.
-It took a few seconds with the smallest training set (1000 by 15 features), a result a little worse than the GLM mode.
+The k nearest neighbours model, is another common model introduced during the course, a simple version of a cluster algorithm, "knn" in the caret package.
 
-There is no ranking of feature importance.  The model used 9 neighbours.
+It took a few seconds with the smallest training set with a result a little worse than the GLM model, 0.038137.  There is no ranking of feature importance.  The model used 9 neighbours.
 
-The larger training sets worked within a few minutes, however, the result was significantly worse than with a smaller training set.  The number of features made no difference, but the number of observations, with a subset it was much better performing.
+The larger training sets worked within a few minutes, however, the result was significantly worse than with a smaller training set, 0.070648.  The number of features made no difference, but it was much better performing with a subset of the number of observations.
 
 ```{r knn modelling, eval=FALSE}
 # with the smaller training set
@@ -1484,7 +1962,7 @@ rmse_results %>% knitr::kable()
 
 It is able to handle the categorical features, which makes sense, as it is not carrying out a regression analysis, however, the results were poor.
 
-I understand that the algorithm is influenced by the absolute value of each feature and therefore the data needs to be normalised.  The "smaller" training set does not include the age and location, which are the two features which have values over 1 and perhaps this is why the performance is better with the smaller set.  As a quick test, I have removed those features, age and location from the small set.  This works, and performs better than the smaller set, so on the right track, but still not as good as the GLM model.  
+The algorithm is influenced by the absolute value of each feature and therefore the data needs to be normalised.  The "smaller" training set does not include the age and location, which are the two features which have values over 1 and perhaps this is why the performance is better with the smaller set.  As a quick test, the age and location features were from the small set, and the result was better than the smaller set at 0.029905, so on the right track, but still not as good as the GLM model.  Using the same logic with the full data set, with no categorical data and no age or location gives a result of 0.023753.
 
 ```{r knn model without age and location, eval=FALSE}
 # test if it will work with categorical feature the the smaller_cat
@@ -1503,15 +1981,29 @@ result_knn_train_set_knn_small <- results_train_method(train_set_knn_small, "knn
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_knn_train_set_knn_small$results, 1))
 rmse_results %>% knitr::kable()
+  
+#making a new final training set, no categorical, without the age and area
+train_set_knn_final_nocat <- train_final_nocat %>%
+  select(-age_median, -area_code)
+#checking the max, should be 1
+max(train_set_knn_final_nocat[1,])
+
+#check with the new training set
+result_knn_train_set_knn_final_nocat <- 
+  results_train_method(train_set_knn_final_nocat, test_set_final, "knn")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_knn_train_set_knn_final_nocat$results, 1))
+rmse_results %>% knitr::kable()
 ```
 
-I normalised the data so that the features are between 0 and 1, working on the full data set, less categorical data.
+The features were then normalised to between 0 and 1, working on the full data set, less categorical data, using the calculation below:
 
 $normalised feature = { \frac{feature - min(feature)}{max(feature) - min(feature)}}$
 
 The summary function shows the variability of maximum, minimum and median.
 
-```{r knn with normalised data, eval=FALSE}
+```{r knn with normalised data}
 #normalising the data, to be between 0 and 1
 #look at some of the data, show the max and min
 summary(train_final_nocat[,4:7])
@@ -1522,10 +2014,14 @@ normalise <- function(feature) {
 train_final_norm <- train_final_nocat[1] %>%
   cbind(as.data.frame(lapply(train_final_nocat[2:59], normalise)))
 #check the data again
-identical(names(train_final_norm), names(train_final_nocat))
+# identical(names(train_final_norm), names(train_final_nocat))
 print("after normalising")
 summary(train_final_norm[,4:7])
+```
 
+This was run on the full data set, and did not perform well at all, worse than predicting the average at 0.102314.  Perhaps with normalising, the algorithm is unable to discriminate features with little variation from those with big changes for the different areas.
+
+```{r knn with the normalised data, eval=FALSE}
 #check with the new normalised training set
 result_knn_train_final_norm <- results_train_method(train_final_norm, "knn")
 # extract the rmse from the results
@@ -1533,8 +2029,6 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_knn_train_final_norm$results, 1))
 rmse_results %>% knitr::kable()
 ```
-
-This was run on the full data set, and did not perform well at all, worse than predicting the average.  My guess is that with normalising, the algorithm will see all features as the same, even the ones with little variation, or importance.
 
 Overall KNN does not produce great results with this data set, however, it looks like the number of neighbours k can be improved.
 
@@ -1563,9 +2057,9 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% tail(5) %>% knitr::kable()
 ```
 
-There may be ways to tune further with improved data, as I managed to get to 0.023508 with the full set less categorical, with k=13, with the age and location removed.
+There may be ways to tune further, as the RMSE was improved to 0.023508 with the full data set less categorical features, age and location, using a k value of 13.
 
-There are other algorithms to look at before any further tuning here.
+But given the gap to the leading model, there are many other algorithms to look at before any further tuning here.
 
 Table: KNN model RMSE results for MSOA
 
@@ -1579,14 +2073,13 @@ Table: KNN model RMSE results for MSOA
 
 ### Tree model CART - rpart
 
-This is the simplest tree algorithm, and works with the smaller set with errors, and does not perform well, although it runs quickly 
+This is the simplest tree algorithm, and works with the smaller set with errors, and does not perform well, although it runs quickly, and worked on all the data sets.
 
-The model trained on the small data set is based on the "no qualification" feature, with choices in the tree based on qualification proportions, visible in the importance plot as well, and the full dat set is based on the level4 qualification.
+The model trained on the small data set is based on the "no qualification" feature, with choices in the tree based on qualification proportions, visible in the importance plot as well.  The full data set is based on the level4 qualification.
 
 ```{r rpart model, eval=FALSE}
 # uses the rpart package
 if (!require('rpart')) install.packages('rpart'); library('rpart')
-
 # with the smaller training set
 result_rpart_train_smaller <- results_train_method(train_smaller, "rpart")
 # extract the rmse from the results
@@ -1597,17 +2090,6 @@ importance <- varImp(result_rpart_train_smaller$train, scale=FALSE)
 plot(importance, 20)
 # looking at the model, it is simply based on the no_qualification feature
 result_rpart_train_smaller$train$finalModel
-
-# with the small training set
-result_rpart_train_small <- results_train_method(train_small, "rpart")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, tail(result_rpart_train_small$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance
-importance <- varImp(result_rpart_train_small$train, scale=FALSE)
-plot(importance, 20)
-result_rpart_train_small$train$finalModel
-
 # with the final set
 result_rpart_train_set_final <- results_train_method(train_set_final, "rpart")
 # extract the rmse from the results
@@ -1631,42 +2113,21 @@ Table: CART rpart model RMSE results for MSOA
 
 ### Support Vector Machines - svmLinear
 
-This model is loosely in the clustering family, similar to KNN, but it also works by creating lines between groups, something a bit like linear regression related to the GLM, but using the kernel to shift the data in to different dimensions allowing non-linear boundaries.
+This is a newer and popular model which is loosely in the clustering family, similar to KNN, but it also works by creating lines between groups, something a bit like linear regression related to the GLM.  The documentation describes using a "kernel" to shift the data in to different dimensions allowing non-linear boundaries.
 
-This model runs slowly, a few seconds with even the small set, but a good RMSE result.  It does not provide an importance view, as it makes use of the structure of the data with lines between them.
-
-The second set of data, the small training set of 5832 by 36 has a similar performance to the GLM, but is slow.
+The model runs slowly, a few seconds with even the small set, but a good RMSE result, but does not provide an importance view.  The model worked with all data sets, is able to handle categorical features, with the best results with the full data set.
 
 ```{r svm model, eval=FALSE}
 # using the kernlab package
 if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
-
 # with the smaller training set
 result_svm_train_smaller <- results_train_method(train_smaller, "svmLinear")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_svm_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
+#checking the variable importance, doesn't work
 # importance <- varImp(result_svm_train_smaller$train, scale=FALSE)
-
-# with the small training set
-result_svm_train_small <- results_train_method(train_small, "svmLinear")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, 
-                          tail(result_svm_train_small$results, 1))
-rmse_results %>% knitr::kable()
-
-# with the full train set, less categorical
-result_svm_train_final_nocat <- results_train_method(train_final_nocat, "svmLinear")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, 
-                          tail(result_svm_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
-
-# test if it will work with categorical feature the the smaller_cat
-train_svm <- train(y ~ ., method = "svmLinear", data = train_smaller_cat)
-# svm does work...
-
 # with the full training set
 result_svm_train_set_final <- results_train_method(train_set_final, "svmLinear")
 # extract the rmse from the results
@@ -1675,7 +2136,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 ```
 
-It is able to handle categorical features, and overall is a good model, although very slow.
+Overall this is a good model, close to the GLM in performance, although requiring a lot of computation.
 
 Table: SVM Linear model RMSE results for MSOA
 
@@ -1688,43 +2149,16 @@ Table: SVM Linear model RMSE results for MSOA
 
 ### Stochastic Gradient Boosting	- gbm
 
-This model is one of a popular style, which involves iterative creation of models, trees, to minimise errors, loosely in the tree/random forest group.
+This is another popular style of model, where the "boosting" refers to iterative creation of models, trees, loosely in the tree/random forest group.  In contrast to standard random forest models each new tree is created to minimise the errors from the previous result, "boosting" the performance
 
-It runs well, with results very similar to the GLM and SVM algorithms.  It is not as slow as the SVM model to run, but the results are not quite as good.
+It runs well, on the all data sets, with results very similar to the GLM and SVM algorithms.  It is not as slow as the SVM model to run, but the results are not quite as good.
 
-There is no information on importance of variables.
-
-This algorithm handles the categorical features, with a small improvement.
+There is no information on importance of variables, and it can handle the categorical features, with a small improvement.
 
 ```{r stochastic gradient boosting gbm, eval=FALSE}
 # using the gbmm plyr, package
 if (!require('gbm')) install.packages('gbm'); library('gbm')
 if (!require('plyr')) install.packages('plyr'); library('plyr')
-
-# with the smaller training set
-result_gbm_train_smaller <- results_train_method(train_smaller, "gbm")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, 
-                          tail(result_gbm_train_smaller$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance, doesn't work
-# importance <- varImp(result_gbm_train_smaller$train, scale=FALSE)
-result_gbm_train_smaller$train$finalModel
-
-# with the small train set
-result_gbm_train_small <- results_train_method(train_small, "gbm")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, 
-                          tail(result_gbm_train_small$results, 1))
-rmse_results %>% knitr::kable()
-
-# with the full train set, less categorical
-result_gbm_train_final_nocat <- results_train_method(train_final_nocat, "gbm")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results, 
-                          tail(result_gbm_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
-
 # with the full train set
 result_gbm_train_set_final <- results_train_method(train_set_final, "gbm")
 # extract the rmse from the results
@@ -1748,12 +2182,12 @@ Table: GBM model RMSE results for MSOA
 
 This is part of the artifical neural network family so a different set of machine learning algorithms.
 
-It works, but produces a fairly poor result with the smaller data set, taking a minute or so.  And the small data set took a minute or two, with some errors, with a worse RMSE than the earlier result.  The package had some interoperability issues with the caret package used throughout the rest of the analysis, so I have not used any of the analysis carried out to avoid creating problems with reviewers' R installations.
+It works, but produces a fairly poor result with the smaller data set, taking a minute or so.  And the small data set took a minute or two, with some errors, with a worse RMSE than the earlier result.  The package had some interoperability issues with the caret package used throughout the rest of the analysis, so the analysis has not been used to avoid creating problems with reviewers' R installations.
 
 
 ### Generalized Additive Model using Splines - gam
 
-As GLM is still the leading model, I would like to see if there are other related models which could also be good.  GAM is part of the linear regression model family, with a smoothing function replacing the linear term, by default here using splines.
+As GLM is still the leading model, and the linear version of SVM also performed well, another linear model was selected.  GAM is another successful algorithm, which can be considered as part of the linear regression family.  It operates by adding regression lines on top of each other (which additive in the name refers to), using a smoothing function, in this case a function called "splines".
 
 It worked well with the smaller data set, and does provide the important variables, for the smaller set, being loneparent.
 
@@ -1795,7 +2229,7 @@ Table: GAM model RMSE results for MSOA, with other results for smaller data sets
 
 ### Least Absolute Shrinkage and Selection Operator - lasso
 
-Again looking at linear regression models, related to GLM, I am trying Lasso, a regularisation model, or logic regression.  It produces decent results with the smaller training set, with quick results from the other data set, handling categorical data.  The rmse results look identical to the GLM model.
+Again looking at linear regression models, related to GLM, another model is Lasso, a regularisation model, or logic regression.  It produces decent results with the smaller training set, with quick results from the other data set, handling categorical data.  But the rmse results look identical to the GLM model.
 
 Table: Lasso model RMSE results for MSOA
 
@@ -1843,7 +2277,7 @@ rmse_results <- bind_rows(rmse_results, tail(result_lasso_train_set_final$result
 result_lasso_train_set_final$results$rmse
 ```
 
-A visual inspection of the y_hat for glm and lasso models, they are the same, however they are not identical using the "identical" function, but with "all.equal" which allows for some slight differences they are identical across the RMSE and $\hat{y}$ predictions.
+A visual inspection of the y_hat for glm and lasso models, they are the same, however they are not identical using the "identical" function, although this may be due to rounding.  The "all.equal" function allows for some slight differences, and this shows that they are identical across the RMSE and $\hat{y}$ predictions, as can be seen from the plot.
 
 ```{r comparing lasso and glm}
 load("rda/result_lasso_train_set_final.rda")
@@ -1875,7 +2309,7 @@ data.frame(result_lasso_train_set_final$y_hat,
 
 ### Principal Component Analysis	- pcr
 
-This model, a dimension reduction model, runs quickly, with no problems, but the performance is not good and gets worse with the full data set.  It looks like it does not handle a large number of features, which seems ironic given the purpose of the algorithm is to combine and reduce to a smaller number of components.
+Now choosing a different type of model, this is a dimension reduction model, a family which has good results for recommendation problems with large data sets for example.  It runs quickly, with no problems, but the performance is not good and gets worse with the full data set.  It appears to have a problem with large number of features.
 
 ```{r running the principal component analysis modelling, eval=FALSE}
 # uses package "pls"
@@ -1922,9 +2356,9 @@ Table: PCR model RMSE results for MSOA
 
 ### Bayesian Generalized Linear Model - bayesglm
 
-This is from the Bayes, family, a regression model as most of the Bayes models are for categorical problems.  It runs fine with the fist smaller data set, and with the small data set.  No feature importance unfortunately, although the "finalmodel" does give detail of the coefficients used.
+From another family, Bayes, but a regression model as most of the Bayes models are for categorical problems.  It runs fine with the fist smaller data set, and with the small data set.  No feature importance unfortunately, although the "finalmodel" does give detail of the coefficients used.
 
-The results in terms of y_hat predictions are very similar to the GLM, so no need to look further at this model.
+The results in terms of y_hat predictions are very similar to the GLM.
 
 Table: BayesGLM model RMSE results for MSOA
 
@@ -1967,7 +2401,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 ```
 
-A visual inspection of the y_hat for glm and Bayesglm models, they are the the same, however they are not identical using the "identical" function, and the "all.equal" gives a difference of 3.148678e-05 for the RMSE, and 0.0002200795 across the $\hat{y}$ predictions, so slightly different, but I believe similar enough to only use one of the models, the GLM.
+A visual inspection of the y_hat for glm and Bayesglm models, they are the the same, however they are not identical using the "identical" function, and the "all.equal" gives a difference of 3.148678e-05 for the RMSE, and 0.0002200795 across the $\hat{y}$ predictions, so slightly different, but similar enough to only use one of the models, the GLM.
 
 ```{r comparing glm and bayes glm}
 load("rda/result_bayesglm_train_set_final.rda")
@@ -1997,16 +2431,13 @@ data.frame(result_bayesglm_train_set_final$y_hat,
 
 ### Generalized Additive Model using LOESS - gamLoess
 
-Trying again with a GAM model, as it is in the linear regression family, and the GAM did run well on the smaller set.  However, it appears to suffer the same issues, being  slow with lots of warnings, even for the smaller data set.
+As the GAM model is in the linear regression family, and the GAM ran well on the smaller set, an alternative using LOESS for the additive regression models.  However, it appears to suffer the same issues, being slow with lots of warnings, even for the smaller data set, and taking too long with the small data set.
 
-With the smaller data set the important features were the industries, in contrast to most other models which focused on the lone parent, but the performance in terms of RMSE was pretty good for the smaller set.
-
-However, similarly to the earlier GAM model, this did not converge with even the small data set.  
+With the smaller data set the important features were the industries, in contrast to most other models which focused on the lone parent, but the performance in terms of RMSE was not bad for the smaller set.
 
 ```{r gam loess, eval=FALSE}
 # uses the gam package
 if (!require('gam')) install.packages('gam'); library('gam')
-
 # with the smaller training set
 result_gamloess_train_smaller <- results_train_method(train_smaller, "gamLoess")
 # extract the rmse from the results
@@ -2037,31 +2468,14 @@ Table: GAM loess model RMSE results for MSOA, including other smaller data set r
 
 ### Random Forest - ranger
 
-I tried this model as part of the tree family, a more complex one than CART.  It performed well, but slowly with the smaller data set, though.
+Now exploring the tree family further after the poorly performing simple tree model CART-rpart.  The Ranger model is one of the random forest variants, and it was a big improvement, but slow, due to the many iterations to build the forest of trees.
 
-For the smaller data set, the model runs slowly with high CPU utilisation and without providing the variable importance.  The results are OK in term of RMSE, behind the leading models, and with a lot of processing.  It runs with the categorical features with a very slight improvement.
+It ran with all the data sets including the categorical, but slowly, and very high CPU.  The RMSE performance was behind the leading models. 
 
 ```{r ranger random forest, eval=FALSE}
 # uses the e1071, ranger, dplyr packages
 if (!require('ranger')) install.packages('ranger'); library('ranger')
 if (!require('e1071')) install.packages('e1071'); library('e1071')?
-  
-# with the smaller training set
-result_ranger_train_smaller <- results_train_method(train_smaller, "ranger")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_ranger_train_smaller$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance, not present
-importance <- varImp(result_ranger_train_smaller$train, scale=FALSE)
-result_ranger_train_smaller$train$finalModel
-
-# with the small training set
-result_ranger_train_small <- results_train_method(train_small, "ranger")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_ranger_train_small$results, 1))
-rmse_results %>% knitr::kable()
 
 # with the full training set
 result_ranger_train_set_final <- results_train_method(train_set_final, "ranger")
@@ -2083,46 +2497,12 @@ Table: Ranger model RMSE results for MSOA
 
 Trying a further variant of the GLM model, a boosted model, meaning that there are multiple iterations, each building on the next to improve the model.
 
-This runs fine on the smaller set, with importance, and is driven by the lone parent as for other models.
-
-It runs quickly, without errors.  It can use the categorical features, and with the final set it is marginally better.
+This runs fine on the smaller set, with importance, and is driven by the lone parent as for other models.  It runs quickly, without errors on all the data sets, includint the categorical features, and with the final set it is marginally better.
 
 ```{r boosted generalised linear model glmboost, eval=FALSE}
 # uses the plyr, mboost packages
 if (!require('mboost')) install.packages('mboost'); library('mboost')
 if (!require('plyr')) install.packages('plyr'); library('plyr')
-
-# with the smaller training set
-result_glmboost_train_smaller <- results_train_method(train_smaller, "glmboost")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_glmboost_train_smaller$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance
-importance <- varImp(result_glmboost_train_smaller$train, scale=FALSE)
-plot(importance, 20)
-result_glmboost_train_smaller$train$finalModel
-
-# with the small training set
-result_glmboost_train_small <- results_train_method(train_small, "glmboost")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_glmboost_train_small$results, 1))
-rmse_results %>% knitr::kable()
-
-#test the categorical
-result_glmboost_train_smaller_cat <- results_train_method(train_smaller_cat, "glmboost")
-# it works
-
-# with the full training set, no categorical features
-result_glmboost_train_final_nocat <- results_train_method(train_final_nocat, "glmboost")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_glmboost_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance
-importance <- varImp(result_glmboost_train_final_nocat$train, scale=FALSE)
-plot(importance, 20)
 
 # with the full training set
 result_glmboost_train_set_final <- results_train_method(train_set_final, "glmboost")
@@ -2143,7 +2523,7 @@ load("rda/importance_glmboost.rda")
 plot(importance, 10)
 ```
 
-Reviewing the model, it looks like the nunber of iterations of "boosting" could be increased which would increase the accuracy.  However, it is far away from the leading models, and this would not  close that large a gap, and also, that is likely to overfit the specific train/test data sets.
+Reviewing the model, it looks like the number of iterations of "boosting" could be increased which would increase the accuracy.  However, it is far away from the leading models, and this would not  close that large a gap, and also, that is likely to overfit the specific train/test data sets.
 
 ```{r glmboost tuning parameters}
 # tuning for glmboost
@@ -2164,40 +2544,13 @@ Table: GLM Boost model RMSE results for MSOA
 
 ### Model Averaged Neural Network - avNNet
 
-This is a neural network model, the first I have tried.  The performance is bad for the smaller and small sets, but the results get worse with the final set (without the categorical).  It must struggle with more features, however it does operate fairly quickly, and it does work with the categorical features.
+This is a neural network model, the first attempted.  There is little documentation, but it appears to operate as a deep learning algorithm with a hidden layer between the features and outcome, estimating weights between them, being a value describing the strength of the link between them.  This is modelled a number of times with random initial values, averaged for the final result.  For example, the initial model with the smaller data set is described as 15-5-1 (15 features, 1 outcome, 5 hidden points) with 86 weights between them.
 
-With the full training set, the performance was good, not as good as the GLM, but better than most.
-
-There is no information on the importance of features.
+With the full training set, the performance was good, not as good as the GLM, but better than most.  There is no information on the importance of features, and it is quite slow due to the need to compute so many variables, so many times.
 
 ```{r model averaged neural network, eval=FALSE}
 # uses the nnet package
 if (!require('nnet')) install.packages('nnet'); library('nnet')
-
-# with the smaller training set
-result_avnnet_train_smaller <- results_train_method(train_smaller, "avNNet")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_avnnet_train_smaller$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance, not there
-importance <- varImp(result_avnnet_train_smaller$train, scale=FALSE)
-#check the model
-result_avnnet_train_smaller$train$finalModel
-
-# with the small training set
-result_avnnet_train_small <- results_train_method(train_small, "avNNet")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_avnnet_train_small$results, 1))
-rmse_results %>% knitr::kable()
-
-# with the full train set, less categorical
-result_avnnet_train_final_nocat <- results_train_method(train_final_nocat, "avNNet")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_avnnet_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
 
 # with the full train set
 result_avnnet_train_set_final <- results_train_method(train_set_final, "avNNet")
@@ -2217,39 +2570,14 @@ Table: avNNet model RMSE results for MSOA
 
 ### Support Vector Machines with Linear Kernel -	svmLinear2
 
-As the SVM linear was the best so far other than GLM, I wanted to try some related models to see if there could be an improvement.
+Selecting another SVM model, as the SVM linear was the best so far other than GLM.  As linear models have performed well, this is an attempt with a different linear model, using a different package.
 
-This is slow, no feature importance, but providing good results.
+It is slow, works with all data sets, with no feature importance, but providing good results.
 
 ```{r svmlinear2, eval=FALSE}
 # uses the e1071 package
 if (!require('e1071')) install.packages('e1071'); library('e1071')
 
-# with the smaller training set
-result_svm2_train_smaller <- results_train_method(train_smaller, "svmLinear2")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_svm2_train_smaller$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance, not there
-importance <- varImp(result_svm2_train_smaller$train, scale=FALSE)
-
-# with the small training set
-result_svm2_train_small <- results_train_method(train_small, "svmLinear2")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_svm2_train_small$results, 1))
-rmse_results %>% knitr::kable()
-
-# with the full train set, less categorical
-result_svm2_train_final_nocat <- results_train_method(train_final_nocat, "svmLinear2")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_svm2_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
-
-# seems similar to the svmlinear
-# checking...
 # compare svmlinear and svmlinear2 predictions
 result_svm2_train_set_final <- results_train_method(train_set_final, "svmLinear2")
 # extract the rmse from the results
@@ -2265,12 +2593,11 @@ Table: SVM Linear2 model RMSE results for MSOA and comparison with SVM Linear
 |method                                       |     rmse|
 |:--------------------------------------------|--------:|
 |"svmLinear" - train_smaller                  | 0.039519|
-|"svmLinear" - train_small                    | 0.024422|
 |"svmLinear" - train_set_final                | 0.016737|
 |"svmLinear2" - train_smaller                 | 0.039501|
 |"svmLinear2" - train_set_final               | 0.016748|
 
-Visual inspection shows a small difference with the RMSE and also the y_hats seem very close, tracking each other, with a "Mean relative difference" through the all.equal function of 0.0003343818.  I will leave further investigation here and focus on the svmlinear.
+Visual inspection shows a small difference with the RMSE and also the y_hats seem very close, tracking each other, with a "Mean relative difference" through the all.equal function of 0.0003343818.  The project will focus on the svmlinear and not explore this version any further.
 
 ```{r comparing svmlinear and svmlinear2}
 load("rda/result_svm2_train_set_final.rda")
@@ -2292,32 +2619,17 @@ all.equal(result_svm2_train_set_final$y_hat,
 
 ### Support Vector Machines with Radial Kernel -	svmRadial
 
-For a final model I tried another variant of the SVM model is the best performing so far after the GLM, and a much discussed model type.  There are a number of variants which use different "kernels" which create the abstracted relationships between the features. I chose the SVM Radial, which although using the same package, "kernlab", it has a different kernel, which means it handles the non-linear elements differently.
+For a final model trying another variant of the SVM model as it is the best performing so far after the GLM, and a much discussed model type.  There are a number of variants which use different "kernels" which create the abstracted relationships between the features.  The SVM Radial was selected, which although using the same package, "kernlab", it handles the non-linear elements differently.
 
-This model runs a little more quickly than the svmlinear and svmlinear2 models, but is also much better performing, the leading model so far, by some distance.
+This model runs a little more quickly than the svmlinear and svmlinear2 models, works on all data sets, and is also much better performing, the leading model so far, by some distance.  Interestingly the categorical data, so the regional data, makes a big improvement on the overall RMSE results.
 
 ```{r svm radial modelling, eval=FALSE}
 # uses package kernlab
 if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
 
-# with the smaller training set
-result_svmradial_train_smaller <- results_train_method(train_smaller, "svmRadial")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_svmradial_train_smaller$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance, not here
-importance <- varImp(result_svmradial_train_smaller$train, scale=FALSE)
-
-# with the small training set
-result_svmradial_train_small <- results_train_method(train_small, "svmRadial")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_svmradial_train_small$results, 1))
-rmse_results %>% knitr::kable()
-
 # with the full train set, less categorical
-result_svmradial_train_final_nocat <- results_train_method(train_final_nocat, "svmRadial")
+result_svmradial_train_final_nocat <- 
+  results_train_method(train_final_nocat, test_set_final, "svmRadial")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_svmradial_train_final_nocat$results, 1))
@@ -2352,26 +2664,26 @@ Table: SVM Radial model RMSE results for MSOA
 
 ### Model summary
 
-A summary of the models attempted:
+The table below shows the leading models being SVM Radial, and behind that the GLM and SVM Linear.  In addition the GAM and GAM Loess both performed well on the smaller data set, and there are a handful providing importance values.
+
 
 Table: Summary of model RMSE performance for MSOA
 
 |Name     | Family              | Results         | RMSE    | Speed  |Importance|
 |:--------|:--------------------|:----------------|:--------|:-------|:---------|
+|svmRadial  | clustering       | very good      | 0.014525| medium | no  |
 |glm      | linear regression   | very good     | 0.016681| fast | yes  |
 |svmlinear| linear / clustering | very good     | 0.016737| slow | no   |
 |gbm      | boosted trees      | good          | 0.017467| medium | yes |
-|rpart    | tree                | poor         | 0.050706| fast   | yes |
 |ranger     | tree / random forest | ok/good     | 0.018276| slow   | no |
+|avNNet     | deep learning      | ok/good      | 0.019568| medium | no |
 |glmboost   | boosted linear     | ok           | 0.020032| fast   | yes |
-|avNNet     | deep learning      | ok/good        | 0.019568| medium | no |
 |gam      | regression         | good on smaller| 0.036524| slow   | no |
 |gamLoess  | regression        | good on smaller| 0.038299| slow   | yes |
 |knn        | clustering       | poor           | 0.023753| medium | no |
+|pcr        | dimension reduction  | poor           | 0.046037| fast   | no |
 |rpart      | tree             | poor           | 0.050706| fast   | yes |
 |mlp        | deep learning        | poor           |         | slow   | no |
-|pcr        | dimension reduction  | poor           | 0.046037| fast   | no |
-|svmRadial  | clustering           | very good      | 0.014525| medium | no  |
 
 svmLinear2 - similar to svmlinear   
 lasso - duplicate of the glm model   
@@ -2380,9 +2692,9 @@ bayesglm - similar to the glm
 
 ## Ensemble model
 
-As a next step I will try and build an ensemble of the best of the models that have been tried, which should have a better result than a single model.
+An ensemble will was created as the final model.  As part of this further work was carried out to make use of the GAM and GAM Loess models, for use in the final ensemble.
 
-As this is a regression problem, I took the average of the y_hat predictions for the models.
+As this is a regression problem, the ensemble prediction is the average of the y_hat predictions for the models.
 
 Following are the leading models.
 
@@ -2403,7 +2715,7 @@ Initially the 5 best models were used:
 * Stochastic Gradient Boosting - gbm
 * Random Forest - ranger
 
-With a result of 0.015242, this is much worse than the svmRadial on its own at 0.0145255.
+This produced a result of 0.015242, this is much worse than the svmRadial on its own at 0.0145255.
 
 ```{r ensemble model 1}
 # create an ensemble y hats
@@ -2463,7 +2775,7 @@ rmse_results %>%
   knitr::kable(caption="Leading models with the smaller data set")
 ```
 
-Of the models that worked on the full set, there are three which provided information on the importance of features, GBM, GLM and GLMBoost.  I took these and created averages of the importance, two methods, average of the ranking and average of the actual scores, normalised.  The latter should provide the better result overall, and with testing it does so.
+Of the models that worked on the full set, there are three which provided information on the importance of features, GBM, GLM and GLMBoost.  From the separate models, the importance was averaged using two methods, average of the ranking and average of the actual scores, normalised.  The latter should provide the better result overall, and with testing it does so.
 
 ```{r prioritised importance of features, message=FALSE}
 # using GLM, GBM, GLM boost to rank features
@@ -2512,7 +2824,7 @@ feature_rank %>% select(feature, mean_rank, mean_overall) %>%
 
 Plotting these features against the outcome $y$, the managerial and professional occupation ratio, you can see that there are varying distributions.
 
-```{r plot of the top9 features}
+```{r plot of the top9 features, fig.height=4}
 # plotting the top 9
 feature_top9 <- feature_rank %>% 
   select(feature, mean_rank, mean_overall) %>%
@@ -2526,7 +2838,7 @@ train_set_final %>%
                values_to = "value") %>%
   filter(feature %in% feature_top9) %>% 
   ggplot(aes(y, value, col=feature))  + 
-  geom_point() +
+  geom_point(size=0.5) +
   facet_wrap(. ~feature,  scales = "free_y") +
   ggtitle("Outcome y for important features") +
   xlab("y, proportion of managerial & professional") +
@@ -2571,9 +2883,9 @@ data.frame(cor(train_set_final)) %>%
 
 Now we have the ranking order of priority, what is the optimal number for the models that can not handle many features?
 
-I have the performance of the models with the existing training sets (smaller, small, full etc.), and now can calculate  with various numbers of the top features. I will do this for the leading models, GLM, SVM Linear, SVM Radial. 
+In a similar way to calculating the performance of the models with the existing training sets (smaller, small, full etc.), the RMSE can be calculated for various numbers of the top features. This was carried out for the leading models, GLM, SVM Linear, SVM Radial. 
 
-I created a function to create lists of the top n features based on the rankings, and then using that create the training sets.
+The following function to create lists of the top n features based on the rankings, and uses the list to create the training sets.
 
 ```{r feature functions}
 #creating a function to choose the top n features, based on overall score
@@ -2642,7 +2954,7 @@ rmse_results %>%
   knitr::kable(caption="GLM model RMSE results with different feature sets")
 ```
 
-The model was run for the top 10 to top 50 features, with the respective RMSEs for the GLM model, and plotted you can see that there is a steady decrease in RMSE, with a big drop at 23.  It is interesting to see that the overall trend is down, but adding a single feature can increase the RMSE, with the insight that sometimes having more information actually makes the estimate/prediction worse.
+The model was run for the top 10 to top 50 features, with the respective RMSEs for the GLM model, and plotted you can see that there is a steady decrease in RMSE, with a big drop at 23.  It is interesting to see that the overall trend is down, but adding a single feature can increase the RMSE - sometimes having more information makes the estimate/prediction worse.
 
 ```{r plot of rmse with glm top features, eval=FALSE}
 # running with features from top 10 to top 50 say
@@ -2674,7 +2986,7 @@ data.frame(glm_top10_top50) %>%
   ylab("RMSE")
 ```
 
-I also tried this for the SVM Radial algorithm.  This is a bit slower, so I focused on the top 20 to 40 features, incrementing by 2. This also drops quickly after 20, but flattening a bit around the 28 number.
+A similar process was carried out with the SVM Radial algorithm.  As it is much slower, only the top 20 to 40 features were modelled, incrementing by 2. This also drops quickly after 20, but flattening a bit around the 28 number.
 
 ```{r plot of number of features vs y for svm radial, eval=FALSE}
 #not running here due to the time taken
@@ -2707,7 +3019,7 @@ data.frame(svmradial_top20_top40) %>%
   ylab("RMSE")
 ```
 
-Similarly for the SVM algorithm, focusing on the top 20 to 40 features, incrementing by 2 each time.  This seems to have a drop around the 24 and then flattish until dropping again around 32/33.
+Similarly for the SVM linear algorithm, focusing on the top 20 to 40 features, incrementing by 2 each time.  This seems to have a drop around the 24 and then flattish until dropping again around 32/33.
 
 ```{r running svm vs features, eval=FALSE}
 # not running as it takes a while
@@ -2739,7 +3051,7 @@ data.frame(svm_top20_top40) %>%
   ylab("RMSE")
 ```
 
-This indicates that the algorithms should use at least the top 24 features, as there is a bit drop just beforehand, and potentiall around 28 to have the biggest impact on the overall RMSE.
+This indicates that the algorithms should use at least the top 24 features, as there is a bit drop just beforehand, and potentially around 28 to have the biggest impact on the overall RMSE.
 
 
 ### Training GAM and GAM loess with fewer features
@@ -2824,7 +3136,7 @@ data.frame(y_hat_gam, y_hat_gamLoess) %>%
   ylab("number of predictions in each interval")
 ```
 
-I tried on the KNN model, but although it was the best it had produced it is still some distance behind the leading models.
+The smaller set was also used with th KNN model, but although it was the best it had produced it is still some distance behind the leading models.
 
 ```{r knn with the top 28 features, eval=FALSE}
 # running on knn with 28 features, less age and area
@@ -2840,7 +3152,7 @@ rmse_results %>% knitr::kable()
 
 ### Final ensemble model
 
-Now looking at the top models, the best are GAM, GLM and SVM Linear, with GAM Loess nearly as good. 
+Now looking at the top models, the best are SVM Radial, GAM, GLM and SVM Linear, with GAM Loess nearly as good. 
 
 ```{r checking the top models again}
 # updating the ensemble with the new models
@@ -2851,7 +3163,7 @@ rmse_results %>%
   knitr::kable(caption="Leading individual models")
 ```
 
-Creating an ensemble to include the GAM and GAM Loess just created,  with five models (GLM, SVM Linear, SVM Radial, GAM, GAM Loess), averaging the prediction, the result is an RMSE of 0.0149383, vs the SVM Radial model of 0.0145255, and only slightly better than the last ensemble of three (GLM, SVM Linear, SVM Radial), which is maybe because the strong performance of the GAM is counterbalanced by the relatively poor GAM Loess.
+Creating an ensemble to include the GAM and GAM Loess just created, with five models (GLM, SVM Linear, SVM Radial, GAM, GAM Loess), averaging the prediction, the result is an RMSE of 0.0149383, vs the SVM Radial model of 0.0145255, and only slightly better than the last ensemble of three (GLM, SVM Linear, SVM Radial), which is maybe because the strong performance of the GAM is counterbalanced by the relatively poor GAM Loess.
 
 ```{r ensemble3 with best five models including gam gamloess, eval=FALSE}
 #loading the separate model information
@@ -2894,7 +3206,7 @@ Table: Leading models including the ensembles, with MSOA
 |"gam" - train_top28                          | 0.015935|
 |"glm" - train_set_final                      | 0.016681|
 
-Now creating an ensemble with the best three models, (GLM, SVM Radial, GAM), averaging the prediction, the result is an RMSE of 0.014395, vs the SVM Radial model of 0.0145255, so improving and now the best result overall.
+Creating an ensemble with the best three models, (GLM, SVM Radial, GAM), the result is an RMSE of 0.014395, vs the SVM Radial model of 0.0145255, so improving and now the best result overall.
 
 ```{r ensemble4 with best three models, eval=FALSE}
 # an ensemble of the best three models
@@ -2915,16 +3227,6 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>%
   arrange(rmse) %>% head(5) %>% knitr::kable()
 ```
-
-Table: Leading models including the ensembles, with MSOA
-
-|method                                       |     rmse|
-|:--------------------------------------------|--------:|
-|Ensemble4 svmRadial, gam, glm                | 0.014395|
-|"svmRadial" - train_set_final                | 0.014525|
-|Ensemble3 glm, svm, svmRadial, gam, gamLoess | 0.014938|
-|Ensemble2 glm, svm, svmRadial                | 0.014962|
-|Ensemble glm, gbm, svm, svmRadial, ranger    | 0.015242|
 
 Finally, creating an ensemble with the best two models, (SVM Radial and GAM), averaging the prediction, the result is an RMSE of 0.013991 which is a significant improvement over the previous ensemble and over the SVM Radial and GAM separately.  This is the final model for the best result for this project.
 
@@ -3002,19 +3304,21 @@ y_hat_ens_table5 %>%
   ylab("actual values, y") 
 ```
 
+\newpage
+# Final model for MSOA
 
-# Final model
+This section covers the calculation of the final results for the MSOA, using the main/validation set.
 
-The final model is an ensemble of SVM Radial, using all of the features and GAM using the top 28 features, where the features are prioritised based on the normalised importance scores from the GLM, GBM and GLM boost models.
+The final model is an ensemble of two algorithms, the SVM Radial, using all of the features and GAM using the top 28 features, where the features are selected based on the normalised importance scores from the GLM, GBM and GLM boost models.
 
 Both of these require quite a lot of computation, with GAM particularly slow.  This may be a problem with larger data sets, say, using the full SOA data, and may lead to needing to reduce the number of features further.
 
 
 ## MSOA with main / validation data sets
 
-I will use the final model developed with the train/test data to train the final predictions.
+The final model developed with the train/test data will be used to train the final predictions.
 
-Taking the main/validation data put together in the earlier section, and including the geo_location table which uses the external data on the location IDs to put together the region features, I have created the cleansed versions of the main and validation sets.
+Taking the main/validation data put together in the earlier section, and the geo_lookup table developed from the census information, cleanse data function was used to create the versions of the main and validation sets for training and testing.
 
 ```{r create clean main and validation, message=FALSE}
 #run on the test set and train set
@@ -3027,7 +3331,7 @@ main_clean <- data_cleanse(main, "msoa")
 validation_clean <- data_cleanse(validation, "msoa")
 ```
 
-Now I run the training and testing on the data sets, the baseline of mean, GLM as a comparison, and SVM Radial, all at default.  The mean is slightly better (0.091347 vs 0.096470), GLM worse (0.016939 vs 0.016681) and SVM Radial significantly worse (0.015654 vs 0.014525) than the performance using the train/test data.
+Now training and testing on the data sets, calculating mean as the the baseline, GLM as a comparison, and SVM Radial, all at default.  The mean is slightly better (0.091347 vs 0.096470), GLM worse (0.016939 vs 0.016681) and SVM Radial significantly worse (0.015654 vs 0.014525) than the performance using the train/test data.
 
 ```{r mean glm svmradial on the main validation, eval=FALSE}
 # create baseline
@@ -3120,13 +3424,14 @@ y_hat_ens_main %>%
 ```
 
 
-## Running the models with the SOA data
+# Running the models with the SOA data
 
-I have carried out the analysis so far with MSOA data, around 7000 observations, nationwide.  I will now work with the SOA data, considerably more detailed.
+The analysis so far has been carried out using the MSOA data, around 7000 observations, nationwide.  Now the methodology will be used with the SOA data, considerably more detailed and larger, to see how it behaves.
 
-Rather than all 130,000 entries, I will focus on two SOA areas, London and Yorkshire and The Humber, as these will have some variety in the types of areas, roles and people.  The London set had 25,053 observations, and the Yorkshire had 17,275, making 42,328 in total.
+Rather than all 130,000 entries, two SOA areas were selected, London and Yorkshire and The Humber, as these will have some variety in the types of areas, roles and people.  The London set had 25,053 observations, and the Yorkshire had 17,275, making 42,328 in total.
 
-### Importing the data
+
+## Importing the data
 
 In turn for London and Yorkshire, the code will download the csv data from Nomis, using the function created earlier, and then run the functions to extract the features and create the "data_set" object.
 
@@ -3159,7 +3464,7 @@ data_set_yorkshire <- data_set
 # load("rda/data_set_2013265923TYPE299.rda")
 ```
 
-Then I combined in to a single data set (adding rows together) before creating the main/validation sets, and the train/test.
+These were combined in to a single data set (adding rows together) before creating the main/validation sets, and the train/test.
 
 ```{r combined the SOA data, warning=FALSE}
 # load the yorkshire and humber data
@@ -3201,9 +3506,9 @@ train_soa_final <- data_cleanse(train_soa, "soa")
 ```
 
 
-### Initial baseline and visualisation
+## Initial baseline and visualisation
 
-Firstly I created the initial baseline RMSE based on the mean, which is 0.133419, much worse than the MSOA data which was 0.096470.  I expected this, as I was hoping that the variability with the smaller areas would be greater.  It could be that focusing on two more extreme areas in the UK could exacerbate this.
+As before, an initial baseline RMSE based on the mean was created, which is 0.133419, much worse than the MSOA data which was 0.096470.  This is as expected this, as there should be greated variability with the smaller areas.  It could be that focusing on two more extreme areas in the UK could exacerbate this.
 
 ```{r rmse baseline for SOA}
 #### baseline rmse and rmse function
@@ -3334,21 +3639,22 @@ train_soa_final %>%
 ```
 
 
-### Modelling
+## Modelling
 
-Initially I will model with the top three models with feature importance from the MSOA work, to be able to develop the top 28 features for the GAM model:
+Following the MSOA analysis, the top three algorithms which provide feature importance will be trained and tested, to develop the top 28 features for the GAM model:
 
 * GLM
 * GBM
 * GLMBoost. 
 
-Then I will model the top 3 models:
+Then the top 3 algorithms from the MSOA modelling will be trained/tested, using a suitable number of features.  It may be fewer than the MSOA model due to the large data set.
 
 * GLM
 * SVM Radial
-* GAM top 28 features
+* GAM
 
-And build an ensemble with the SVM Radial and GAM 28.
+From this the best models will be used to build an ensemble.
+
 
 ### GLM on the SOA data
 
@@ -3438,7 +3744,7 @@ Table: GLM Boost model RMSE results for SOA
 
 ### Feature prioritisation with the SOA data
 
-With these three models I was able to build the top 28 features, and the data set with the top 28 features.
+With these three models the top 28 features for SOA were identified, and the data set with the top 28 features created.
 
 ```{r top 28 features with SOA, eval=FALSE}
 # top 28 features
@@ -3503,7 +3809,7 @@ rmse_results_soa <- bind_rows(rmse_results_soa,
                           tail(result_svmradial_train_soa$results, 1))
 ```
 
-I therefore tried with the top28 training set, but this failed after taking much longer than the earlier training.
+Therefore the top28 training set was next used, but this failed after taking much longer than the earlier training.
 
 ```{r svm radial with top 28, eval=FALSE}
 # with the top28 train set
@@ -3511,7 +3817,7 @@ result_svmradial_train_soa <-
   results_train_method(train_soa_top28, test_soa_final, "svmRadial")
 ```
 
-This probably means that the algorithm struggles with the amount of data, so I will try again with a smaller data set, to see if we can get it to work at all, it took a long time even with 5 features.  I followed the same process as before, creating a "small" data set with 5000 observations, and even with only 5 features, the result was pretty good, much better than with the full set earlier, with 0.0488267.
+This probably means that the algorithm struggles with the amount of data.  In order to get some results, the same process as with the MSOA data was used, creating a data sets with subsets of features and observations.  Trying a  "small" data set with 5000 observations, and even with only 5 features, the result was pretty good, much better than with the full set earlier, with 0.0488267.
 
 ```{r svm radial SOA with 5 features, eval=FALSE}
 # training with 15 features
@@ -3540,7 +3846,7 @@ rmse_results_soa <- bind_rows(rmse_results_soa,
                               tail(result_svmradial_train_soa_5k_top5$results, 1))
 ```
 
-I have increased the number of features to improve the SVM Radial predictions, with 28 features and 5000 observations this provides good results, 0.0452578, which is now second to the GBM model, with only a seventh of the observations available.
+Increasing the number of features to improve the SVM Radial predictions, 28 features and 5000 observations provided good results, 0.0452578, which is now second to the GBM model, with only a seventh of the observations available.
 
 ```{r svm radial increasing model sizes, eval=FALSE}
 # with the 5k top10 train set
@@ -3639,7 +3945,7 @@ rmse_results_soa <- bind_rows(rmse_results_soa,
                               tail(result_gam_train_soa_small_top28$results, 1))
 ```
 
-Perhaps it is due to the size of the data set again, so I will try with subsets as for the SVM Radial.  GAM top 28 with 5000 observations is not so good, but with 10,000 it is better than with the full set of observations, at 0.045806 close to the GLM model with 0.045790.  However, with 15,000 observations the performance was worse that the 10,000 sample.
+Training with subsets of the data once more, top 28 with 5000 observations is not so good, but with 10,000 it is better than with the full set of observations, at 0.045806 close to the GLM model with 0.045790.  However, with 15,000 observations the performance was worse that the 10,000 sample.
 
 ```{r gam top 28 SOA with different sizes, eval=FALSE}
 # with the 5k top28 SOA training set
@@ -3691,7 +3997,7 @@ Table: GAM model RMSE results for SOA
 |"gam" - train_soa_5k_top28          | 0.0470019|
 
 
-### Final ensemble for the SOA data
+## Final ensemble for the SOA data
 
 Previously for the MSOA model, the best result was an ensemble of two algorithms: SVM Radial and GAM with 28 features.
 
@@ -3730,7 +4036,7 @@ rmse_results_soa %>%
 ```
 
 
-### Visualisation of the results
+## Visualisation of the results
 
 Looking at the results, it is not too illuminating.  In general the distribution is a bit wider than the MSOA areas, nothing too obvious.  Apart from the higher value areas, as the models a bit conservative and pretty much predict no proportions over 0.6, whereas the real data has values as high as 0.7.  This could be the cause of the difference with the SOA results, as the larger MSOA areas would tend to average out and reduce these very high values, and then the weaknesses in the models would not show up.
 
@@ -3742,7 +4048,7 @@ y_hat_ens_table6 %>%
   rename(ensemble_y_hat=y_hat_ave) %>%
   pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
   ggplot(aes(x=y_hat, y=y, col=model)) +
-  geom_point() +  
+  geom_point(size=0.7) +  
   geom_abline(slope = 1, intercept = 0, col="black")  +
   facet_grid(. ~model) +
   ggtitle("Comparing ensemble SOA predictions vs the outcome y") +
@@ -3787,17 +4093,18 @@ y_hat_ens_table6 %>%
   ylab("actual values, y") 
 ```
 
-
+\newpage
 # Model interpretation and feature importance
 
-Returning back to the motivation for this topic to consider achievements of top jobs in the context of the Black lives matter society wide debate.  
+This section returns back to the motivation for this topic to consider achievements of top jobs in the context of the Black lives matter society wide debate.  
 https://www.theguardian.com/business/2020/jul/28/bame-representation-uk-top-jobs-colour-of-power-survey 
 
-In this section I will look at the feature importance and correlation and see if there is data to enlighten the discussion, specifically focusing on the ethnicity features. 
+Feature importance and correlation are analysed to see if there is data to enlighten the discussion, specifically focusing on the ethnicity features. 
+
 
 ## Feature importance 
 
-I carried out an investigation earlier in to the most important features for the MSOA areas with the following features are positively correlated:
+The earlier investigations in to important features for the MSOA areas found  the following features are positively correlated:
 
 * level4_25_64
 * industry_klmn_25_64
@@ -3813,7 +4120,7 @@ The following are negatively correlated:
 
 Carrying out the same analysis for the SOA area, the results have more variety as expected, with a slightly different set of features in the top 9.  One interesting area is in the level4 qualifications, where for the MSOA there was a very clear correlation, but here there are a number of locations with high qualifications and low professional and managerial proportions.
 
-```{r graphs for top features for SOA}
+```{r graphs for top features for SOA, fig.height=4}
 # plotting the top 9 for SOA
 load("rda/feature_rank_soa.rda")
 feature_rank_soa <- feature_rank
@@ -3877,7 +4184,7 @@ Given that they appear in the top lists it is worth looking in mode detail at th
 
 Looking at all the qualification features, and mapping against the y values.  Here only the Level4 and no qualification have values about 0.25, which is likely the reason for being important features in the models.  In addition, all are negatively correlated apart from Level 4, with level 1 and no qualification clearly negative.
 
-```{r graph of qualification features vs y soa, message=FALSE}
+```{r graph of qualification features vs y soa, message=FALSE, fig.height=4}
 # qualification features SOA
 load('rda/qualifications.rda')
 qualifications_features <- names(qualifications) %>% str_subset("25_64")
@@ -3895,7 +4202,7 @@ train_soa_final %>%  select(y, all_of(qualifications_features)) %>%
   ylab("proportion of qualification type")
 ```
 
-```{r graph of qualification features vs y msoa, message=FALSE}
+```{r graph of qualification features vs y msoa, message=FALSE, fig.height=4}
 # qualification features MSOA
 train_set_final %>%  select(y, all_of(qualifications_features)) %>%
   # pivot longer with the features
@@ -3943,7 +4250,7 @@ train_set_final %>%
 
 This can be illustrated further with stratification of the level4 vs y by white uk, where you can see that for lower proportions of white UK, the link with education is less important.  Only SOA data is used here to provide more detail and variation.
 
-```{r stratification by white uk proportion, message=FALSE}
+```{r stratification by white uk proportion, message=FALSE, fig.height=4}
 # looking at stratification for the white uk, soa
 train_soa_final %>%  
   select(y, level4_25_64, white_uk_25_64) %>%
@@ -3991,7 +4298,7 @@ The key industries are:
   + Industry P - Education
   + Industry Q - Human health and social work activities
 
-```{r graph of industry features vs y soa, message=FALSE}
+```{r graph of industry features vs y soa, message=FALSE, fig.height=4}
 # listing industry features
 load('rda/industry.rda')
 industry_features <- names(industry) %>% str_subset("25_64")
@@ -4012,7 +4319,7 @@ train_soa_final %>%  select(y, all_of(industry_features)) %>%
   ylab("proportion of industry type")
 ```
 
-```{r graph of industry features vs y msoa, message=FALSE}
+```{r graph of industry features vs y msoa, message=FALSE, fig.height=4}
 #industry features MSOA
 train_set_final %>%  select(y, all_of(industry_features)) %>%
   #tidy the names, removing the _25_64
@@ -4035,7 +4342,7 @@ train_set_final %>%  select(y, all_of(industry_features)) %>%
 
 In the household features, loneparent has a clear negative correlation, although it does not come out as an important feature, perhaps it is closely related to another feature, or that it, along with cohabiting have a lowish proportion, less than 0.4.  Married family, one person and cohabiting appear on the important lists, but have only a slight gradient.
 
-```{r graph of household features vs y for soa, message=FALSE}
+```{r graph of household features vs y for soa, message=FALSE, fig.height=4}
 # household features soa
 load('rda/household.rda')
 household_features <- names(household) %>% str_subset("25_64")
@@ -4055,7 +4362,7 @@ train_soa_final %>%  select(y, all_of(household_features)) %>%
   ylab("proportion of household type")
 ```
 
-```{r graph of household features vs y for msoa, message=FALSE}
+```{r graph of household features vs y for msoa, message=FALSE, fig.height=4}
 # household features msoa
 load("rda/train_set_final.rda")
 train_set_final %>%  select(y, all_of(household_features)) %>%
@@ -4079,7 +4386,7 @@ train_set_final %>%  select(y, all_of(household_features)) %>%
 
 For Marital predictors, civil, separated and widowed have quite low values, and married and single both have a large spread, with married positively correlated.  Divorced is also clearly negative.
 
-```{r graph of marital status vs y soa, message=FALSE}
+```{r graph of marital status vs y soa, message=FALSE, fig.height=4}
 #marital features soa
 load('rda/marital.rda')
 marital_features <- names(marital) %>% str_subset("25_64")
@@ -4099,7 +4406,7 @@ train_soa_final %>%  select(y, all_of(marital_features)) %>%
   ylab("proportion of marital type")
 ```
 
-```{r graph of marital status vs y msoa, message=FALSE}
+```{r graph of marital status vs y msoa, message=FALSE, fig.height=4}
 #marital features msoa
 load("rda/train_set_final.rda")
 train_set_final %>%  select(y, all_of(marital_features)) %>%
@@ -4125,7 +4432,7 @@ As qualifications are so important to the models, in particular the Level4, it m
 
 Starting with the MSOA data, removing the qualification features, the RMSE is 0.0314370 for GLM, vs 0.0166809 with the full data, significantly worse, and not so far from the baseline of the mean of 0.0965.
 
-Of the features, loneparent is important, as is construction, both of which had strongly negative correlations.  Ethnicities do not gain in importance, with only white irish which was in the top list earlier.  Age and female ration are in the top 10 which seem odd, I would not expect them to be strongly influencing the outcome.
+Of the features, loneparent is important, as is construction, both of which had strongly negative correlations.  Ethnicities are not highlighted, with only white irish which was in the top list earlier.  However, Age and female ratio are in the top 10.
 
 ```{r prediction without qualification data, eval=FALSE}
 ## msoa data
@@ -4161,7 +4468,7 @@ The machine learning model led analysis has not indicated that ethnicities are a
 
 Starting with the visualisation of the distributions of proportions of ethnicities and y, proportion of managerial and professional roles, the fit lines are fairly flat apart from white other (positive), but there are lots of graphs which show a triangle shape with low proportions of senior roles in areas with high concentrations of that ethnicity, particularly Black african, Black other, Bangladeshi and Pakistani.  These are the communities often highlighted in the press as having poor outcomes, backed up by the data here.
 
-```{r graph of ethnicity vs y for soa, message=FALSE}
+```{r graph of ethnicity vs y for soa, message=FALSE, fig.height=4}
 #ethnicity features soa
 load('rda/ethnicity.rda')
 ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
@@ -4184,7 +4491,7 @@ train_soa_final %>%
   ylab("proportion of ethnicity type")
 ```
 
-```{r graph of ethnicity vs y for msoa, message=FALSE}
+```{r graph of ethnicity vs y for msoa, message=FALSE, fig.height=4}
 #ethnicity features msoa
 load("rda/train_set_final.rda")
 train_set_final %>%  
@@ -4268,7 +4575,7 @@ data.frame(train_msoa_rcorr$r) %>%
 
 Carrying out a similar analysis against the level4 qualifications, as expected the results are similar to the more senior managerial and professional occupations, with white other, white Irish and Chinese positive, and white UK and Pakistani negative.
 
-```{r plots of ethnicity vs level4 qualifications for soa, message=FALSE}
+```{r plots of ethnicity vs level4 qualifications for soa, message=FALSE, fig.height=4}
 #ethnicity features vs level4 soa
 load('rda/ethnicity.rda')
 ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
@@ -4366,7 +4673,7 @@ data.frame(train_msoa_rcorr$r) %>%
 
 Stratifying the data can explore how the relationship between qualifications and senior occupations varies with the proportion of black african and black other residents.  Limiting stratas to those with at least 50 samples, and using SOA only as there is more data, it is evident that the relation between occupation and qualification weakens with more Black African residents.
 
-```{r y vs level4 stratified by black african, message=FALSE}
+```{r y vs level4 stratified by black african, message=FALSE, fig.height=4}
 # looking at stratification for the black african, soa
 train_soa_final %>%
   # select columns
@@ -4386,7 +4693,7 @@ train_soa_final %>%
 
 The results with Black other show a similar trend.
 
-```{r y vs level4 stratified by black other, message=FALSE}
+```{r y vs level4 stratified by black other, message=FALSE, fig.height=4}
 # looking at stratification for the black other, soa
 train_soa_final %>%
   # select columns
@@ -4461,7 +4768,7 @@ The graph shows that the only group whose qualifications are below average are w
 
 White Irish are also striking in terms of the qualifications and the seniority of their occupations.
 
-As mentioned, the Asian group includes high performing Chinese and Indian groups, as well as poorly achieving Pakistani and Bangladeshi, and I suspect that the two groups would diverge in terms of both qualifications and occupations.
+As mentioned, the Asian group includes Chinese and Indian groups which are regularly reported as high performing academically and occupationally, as well as Pakistani and Bangladeshi which are often highlighted as struggling.  It is likely that separated in to two, the sub Asian groups would diverge in terms of both qualifications and occupations.
 
 ```{r download data from nomis on ethnicity and qualification, eval=FALSE}
 # look at ratios of ethnicity and occupation and qualification in countries in the UK
@@ -4611,7 +4918,7 @@ ethnicity_25_64_raw <- ethnicity_all_25_64_raw %>%
 save(ethnicity_25_64_raw, file="rda/ethnicity_25_64_raw.rda")
 ```
 
-```{r graph showing proportions per ethnicity, message=FALSE}
+```{r graph showing proportions per ethnicity, message=FALSE, fig.height=4}
 # graph
 load("rda/ethnicity_25_64_raw.rda")
 # calculate the ratio of the working population for each ethnicity
@@ -4641,14 +4948,15 @@ ethnicity_25_64 %>%
             nudge_y=0.015, size = 3.5) + 
 # using the list earlier for the order on the x axis
   scale_x_discrete(limits=ethnicity_graph_order) +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, vjust=1, hjust=1)) +
   ggtitle("Proportions of 25 to 64 year olds in England and Wales") +
   xlab("Ethnic groups") +
   ylab("Proportion of each ethnic group")
 ```
 
-
+*************
+\newpage
 # Results
 <!-- a results section that presents the modeling results and discusses the model performance  -->
 
@@ -4684,7 +4992,7 @@ Table: Summary of modelling results for MSOA areas
 |"gbm" - train_soa_final             | 0.0443612|
 |Ensemble svmRadial, gbm             | 0.0431886|
 
-
+\newpage
 # Conclusion
 <!-- a conclusion section that gives a brief summary of the report, its potential impact, its limitations, and future work. -->
 
@@ -4701,7 +5009,7 @@ In addition the project carried out detailed visualisations of the features, the
 
 The data set worked well as a continuous machine learning problem, it behaved well, with sensible results and a variation in different results from different algorithms.  The data put treated in this way also allowed for some interesting conclusions to be visualised from the features.
 
-There were too many features, and some could probably be removed with little impact, but I did not test that specifically.
+There were too many features, and some could probably be removed with little impact, but the imapct of removing the least 10 or so important features was not specifically tested.
 
 The modelling with the MSOA, and the quick attempt at the SOA indicates that there is potential for a very large data set of 130,000 observations of 50 features, over 6 million pieces of publicly available data.  This may be of interest to test algorithms for working with large numbers of observations and features.
 
@@ -4741,9 +5049,11 @@ There will be many different approaches to large data sets, but these were not r
 
 ### Model interpretation
 
-In general interpretability from the models was not very clear.  Many have no indication of feature importance, or ways to get information out, without running many times with different sets of features.  In addition, the investigation at the end appeared to show som implications from the ethnicity features which were not highlighted in model, where things like lone parent came out as more important.  I suspect this is because there were a lot of features, which are correlated but it does make it hard to use machine learning models to make conclusions other than predictions.
+In general interpretability from the models was not very clear.  Many have no indication of feature importance, or ways to get information out, without running many times with different sets of features.  Furthermore, many of the popular ones for predictions using boosting or additive processes for iterative improvement which obfuscate the data an implications.
 
-The "high correlation" function in caret did not work well at helping feature selection, as some of the listed highly correlated features were the key ones.  Feature importance seemed much more effective in use.  In future I would choose a simple algorithm and see the feature importance as a way of identifying the ones to prioritise.
+In addition, the investigation at the end appeared to show some implications from the ethnicity features which were not highlighted in model, where less intuitive features like lone parent came out as more important.  This may be because there were a lot of related features, so each on its own is less important (such as ethnicity and country of birth), in contrast to age, female ratio, lone parent which are individual.  This does make it hard to use machine learning models to make conclusions other than predictions.
+
+The "high correlation" function in caret did not work well at helping feature selection, as some of the listed highly correlated features were the key ones.  Using feature importance seemed to work, and would be better for future analysis.
 
 
 ## Implications from the modelling
@@ -4809,7 +5119,7 @@ https://www.ethnicity-facts-figures.service.gov.uk/education-skills-and-training
 
 
 
-
+**************
 
 # references
 
@@ -4817,5 +5127,4 @@ https://machinelearningmastery.com/feature-selection-with-the-caret-r-package/
 
 https://machinelearningmastery.com/a-tour-of-machine-learning-algorithms/
 
-https://stats.stackexchange.com/questions/119835/correlation-between-a-nominal-iv-and-a-continuous-dv-variable
 

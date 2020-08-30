@@ -1,17 +1,22 @@
 #### ph125.9x Capstone choose your own project - UK census ####
 # Paul Ceely
-# 07/07/2020
-####################initial set up##########################
-setwd("~/Documents/study/Data-Science-R/ph125.9.Capstone/ChooseYourOwn")
-# raw data in ./data, R objects in ./rda
+# 07/07/2020 to 30/08/2020
+#################### initial set up ##########################
+# setwd("~/Documents/study/Data-Science-R/ph125.9.Capstone/ChooseYourOwn")
+# set the working directory as the current directory of the file
+current_directory <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(current_directory)
+# checking
+getwd()
+# create directories: raw data in ./data, R objects in ./rda
+dir.create("data")
+dir.create("rda")
 # set up libraries
 library(tidyverse)
-# library(ggplot2)
 library(stringr)
 library(rvest)
-# library(tidyr)
-# library(purrr)
 library(caret)
+library(RColorBrewer)
 options(digits = 6)
 
 
@@ -60,14 +65,14 @@ nomis_census_csv <- function(censusdata, geographytype){
   download.file(nomis_session2$url, destfile)
 }
 
-
 # Initially, TYPE480 regions
 geographytype <- "TYPE480" #regions
 # then TYPE297 'super output areas - middle layer 2011
 geographytype <- "TYPE297" #super output areas - middle layer
 # geographytype <- "TYPE499" #countries
 #creating list of census tables to take
-censusdata_list <- c("ks101ew", "ks608ew","ks102ew", "ks201ew","ks501ew", "ks103ew", "ks209ew", "ks105ew", "ks605ew", "qs203ew")
+censusdata_list <- c("ks101ew", "ks608ew","ks102ew", "ks201ew","ks501ew",
+                     "ks103ew", "ks209ew", "ks105ew", "ks605ew", "qs203ew")
 # apply the list to download all of the data
 tmp <- lapply(censusdata_list, function(censusdata){
   # pause for a few random seconds to avoid annoying nomis
@@ -79,7 +84,6 @@ tmp <- lapply(censusdata_list, function(censusdata){
 })
 ### tidy, take backup:
 rm(tmp, filled_form, nomis_form, nomis_session, nomis_session2, filename, nomis_url, nomis_url_root, censusdata_list, censusdata, time)
-
 
 ############ Import and clean the prediction #####################
 # options(digits = 3)
@@ -96,7 +100,6 @@ ingest <- function(censustable, geography){
   return(read_csv(filename))
 }
 
-
 #load in occupation data
 # https://www.nomisweb.co.uk/census/2011/ks608ew
 # import the new table with occupation data
@@ -104,29 +107,36 @@ data <- ingest("ks608ew", geographytype)
 names(data)
 # create mgr-prf ratios
 occupation <- data %>%
-  rename("geo_code" = "geography code", "geo_name" = "geography", "geo_type" = "Rural Urban", "occupation_all" = "Sex: All persons; Occupation: All categories: Occupation; measures: Value") %>%
+  rename("geo_code" = "geography code", 
+         "geo_name" = "geography", 
+         "geo_type" = "Rural Urban", 
+         "occupation_all" = "Sex: All persons; Occupation: All categories: Occupation; measures: Value") %>%
   rowwise() %>%
   # calculate the ratiof of managers and professionals
   mutate(y = 
            (sum(across(contains("Sex: All persons; Occupation: 1. Managers"))) +
-           sum(across(contains("Sex: All persons; Occupation: 2. Professional "))) )/occupation_all) %>% 
+              sum(across(contains("Sex: All persons; Occupation: 2. Professional "))) )
+         /occupation_all) %>% 
   select(geo_name, geo_code, geo_type, y, occupation_all)
 # occupation
 
 #now creating a function for repeatability
 occupation_target <- function(data){
   occupation <- data %>%
-    rename("geo_code" = "geography code", "geo_name" = "geography", "geo_type" = "Rural Urban", "occupation_all" = "Sex: All persons; Occupation: All categories: Occupation; measures: Value") %>%
+    rename("geo_code" = "geography code", 
+           "geo_name" = "geography", 
+           "geo_type" = "Rural Urban", 
+           "occupation_all" = "Sex: All persons; Occupation: All categories: Occupation; measures: Value")  %>%
     rowwise() %>%
-    # calculate the ratiof of managers and professionals
+    # calculate the ratio of managers and professionals
     mutate(y = 
              (sum(across(contains("Sex: All persons; Occupation: 1. Managers"))) +
-                sum(across(contains("Sex: All persons; Occupation: 2. Professional "))) )/occupation_all) %>% 
+                sum(across(contains("Sex: All persons; Occupation: 2. Professional "))) )
+           /occupation_all) %>% 
     select(geo_name, geo_code, geo_type, y, occupation_all)
   #save file
   save(occupation, file='rda/occupation.rda')
 }
-
 #running the function on the data set
 occupation_target(data)
 #adding to main data set
@@ -136,13 +146,13 @@ data_set <- occupation
 save(data_set, file='rda/data_set.rda')
 rm(occupation, occup_tmp)
 
-
 ############ Import and clean the data #####################
 #step wise adding more tables from the census to put together potential predictors
 #load in residents and sex data
 data <- ingest("ks101ew", geographytype)
 names(data)
-colnames(data) <- c("date", "geo_name", "geo_code", "geo_type", "all_residents", "males", "females")
+colnames(data) <- 
+  c("date", "geo_name", "geo_code", "geo_type", "all_residents", "males", "females")
 sex <- data %>% 
   select(2:7) %>%
   mutate(female_ratio = females/all_residents)
@@ -152,7 +162,6 @@ data_set <- data_set %>%
   select(-females, -males)
 save(data_set, file='rda/data_set.rda')
 save(sex, file='rda/sex.rda')
-
 
 # load in age data
 # https://www.nomisweb.co.uk/census/2011/ks102ew
@@ -165,7 +174,9 @@ age <- data %>%
   rename_at(vars(contains("Age")), ~str_replace_all(., "Age: Age ", "age_")) %>%
   rename_at(vars(contains("Age")), ~str_replace_all(., " to ", "_")) %>% 
   rename_at(vars(contains("over")), ~str_replace_all(., " and ", "_")) %>% 
-  rename("geo_code" = "geography code", "all_residents" = "Age: All usual residents", "age_median" = "Age: Median Age") %>% 
+  rename("geo_code" = "geography code", 
+         "all_residents" = "Age: All usual residents", 
+         "age_median" = "Age: Median Age") %>% 
   mutate("under_16" = age_0_4 + age_5_7 + age_8_9 + age_10_14 + age_15) %>%
   mutate("over_74" = age_75_84 + age_85_89 + age_90_over) %>%
   mutate("age_16_to_74" = all_residents - over_74 - under_16) %>%
@@ -183,7 +194,10 @@ age <- age %>%
 # rewriting as a function for the median age only
 age_predictors <- function(data){
   age <- data %>%
-    rename("geo_code" = "geography code", "all_residents" = "Age: All usual residents; measures: Value", "age_median" = "Age: Median Age; measures: Value") %>% select(geo_code, all_residents, age_median)
+    rename("geo_code" = "geography code", 
+           "all_residents" = "Age: All usual residents; measures: Value",
+           "age_median" = "Age: Median Age; measures: Value") %>% 
+    select(geo_code, all_residents, age_median)
   save(age, file='rda/age.rda')
 }
 
@@ -287,7 +301,7 @@ midrule = "\\midrule"
 data.frame("ethnicity categories" = names(ethnicity_ordered)[2:12]) %>%  
   knitr::kable(caption="11 most prevalent ethnicities", 
                latex_options = "striped")
-
+# aggregating the other categories
 ethnicity_aggregated <- ethnicity_raw %>%
   rename("all_25_64" = "age25_64_All_categories_Ethnic_group",
   white_uk_25_64 = "age25_64_White_English_Welsh_Scottish_Northern_Irish_British") %>%
@@ -324,7 +338,9 @@ ethnicity_predictors <- function(data){
   print("manipulating raw data")
   ethnicity_raw <- data %>%
     #keeping only the data relating to age 25 to 64
-    select(contains("geography code") | contains("Age 25 to 49") | contains("Age 50 to 64") ) %>%
+    select(contains("geography code") | 
+             contains("Age 25 to 49") | 
+             contains("Age 50 to 64") ) %>%
     # adding up the year groups
     rowwise() %>%
     mutate("all_25_64" = 
@@ -392,9 +408,12 @@ data <- ingest("lc2101ew", geographytype)
 #creating the raw file
 sex_25_64 <- data %>%
   #filtering all ethnicities
-  select(contains("Ethnic Group: All categories:") | contains("geography code") ) %>%
+  select(contains("Ethnic Group: All categories:") | 
+           contains("geography code") ) %>%
   #filtering to the age groups in question
-  select(contains("Age 25 to 49") | contains("Age 50 to 64") | contains("geography code") ) %>%
+  select(contains("Age 25 to 49") | 
+           contains("Age 50 to 64") | 
+           contains("geography code") ) %>%
   #mutate to create the sums for comparison
   rowwise() %>%
   mutate("all_25_64"= sum(across(contains("Sex: All Persons")))) %>%
@@ -410,16 +429,19 @@ sex_25_64 <- sex_25_64 %>%
 #recreating as a function for reuse
 sex_predictors <- function(data){
   sex_25_64 <- data %>%
-    select(contains("Ethnic Group: All categories:") | contains("geography code") ) %>%
-    select(contains("Age 25 to 49") | contains("Age 50 to 64") | contains("geography code") ) %>%
+    select(contains("Ethnic Group: All categories:") | 
+             contains("geography code") ) %>%
+    select(contains("Age 25 to 49") | 
+             contains("Age 50 to 64") | 
+             contains("geography code") ) %>%
     rowwise() %>%
     #create the ratio necessary
-    mutate(female_ratio_25_64 = sum(across(contains("Sex: Female")))/sum(across(contains("Sex: All Persons")))) %>%
+    mutate(female_ratio_25_64 = sum(across(contains("Sex: Female"))) / 
+             sum(across(contains("Sex: All Persons")))) %>%
     rename("geo_code" = "geography code")  %>%
     select(contains("female_ratio_25_64") | contains("geo_code") )
   save(sex_25_64, file='rda/sex_25_64.rda')
 }
-
 #running the function on the data set
 sex_predictors(data)
 #adding to main data set
@@ -434,7 +456,6 @@ names(data_set)
 #   select(-female_ratio)
 save(data_set, file='rda/data_set.rda')
 rm(sex, sex_25_64, sex_orig)
-
 
 # qualifications
 # https://www.nomisweb.co.uk/census/2011/lc5102ew
@@ -1225,7 +1246,7 @@ main %>%  pivot_longer(
   xlab("proportion for 'uk_25_64' feature") +
   ylab("proportion for other features")
 
-# finally geography
+#### geography ####
 # getting the mapping for the locations
 # https://borders.ukdataservice.ac.uk/lut_download_data.html?data=oa11_lsoa11_msoa11_lad11_ew_lu
 #download file
@@ -1245,9 +1266,11 @@ geo_lookup <- geo_mapping %>%
   rename(local_area = LAD11CD, geo_code_soa=OA11CD, geo_code_msoa = MSOA11CD) %>%
   unique()
 head(geo_lookup)
-
-#however, for many models to work, the feature needs to be numeric, so I need to convert the character strings to numbers, so remove the "E"
-#calculating a list of strings within the local area to be rewritten as numbers, keeping the strings replaced as long as possible to reduce the length of the area_code
+# however, for many models to work, the feature needs to be numeric
+# I need to convert the character strings to numbers, so remove the "E"
+# calculating a list of strings within the local area to be rewritten as numbers
+# keeping the strings replaced as long as possible for smaller area_code
+# retaining a 3 digit long area code
 area_update <- levels(as.factor(str_sub(geo_lookup$local_area, 1, -3)))
 #create a new column to be updated
 geo_lookup <- geo_lookup %>%
@@ -1280,13 +1303,13 @@ download.file(geo_url, 'data/0aac9db88cbb4f8d9db42ad20b03cb71_0.csv')
 # load in file
 region_mapping<- read.csv('data/0aac9db88cbb4f8d9db42ad20b03cb71_0.csv')
 save(region_mapping, file='rda/region_mapping.rda')
+#checking the data
+# load('rda/region_mapping.rda')
 head(region_mapping)
 levels(as.factor(region_mapping$RGN11NM))
-load('rda/region_mapping.rda')
-#checking the data
-levels(as.factor(region_mapping$RGN11NM))
 # some have empty region name
-# visual inspection shows that the unnamed regions are all Wales, and the local area ids start with "W"
+# visual inspection shows that the unnamed regions are all Wales
+# and the local area ids start with "W"
 #there is a blank, for row 1, to be investigated
 region_mapping %>%
   select(LAD11NM, LAD11CD, RGN11NM) %>%
@@ -1299,21 +1322,24 @@ region_lookup <- region_mapping %>%
   rename(local_area = LAD11CD, region = RGN11NM) %>%
   select(local_area, region) %>%
   unique()
+# check the regions, showing the blank
 levels(as.factor(region_lookup$region))
 head(region_lookup)
-# update empty fields to be "wales"
-# not using this as it matches the isles of scilly as well
-# index <- str_length(region_mapping$region) == "0"
+# update empty fields to be "wales", where the local area starts with "W0"
+# create an index of areas starting with W
 index <- str_which(region_lookup$local_area, "W0")
+# confirm it works
 region_lookup[index,]
+# add wales to the region column for those areas
 region_lookup$region[index] <- "wales"
+# check the regions, now including wales
 levels(as.factor(region_lookup$region))
-#removing the blank line
+#removing the blank line (Isles of Scilly)
 region_lookup <- region_lookup %>%
   filter(region != "")
 #confirm that the regions are now correct
 levels(as.factor(region_lookup$region))
-# updating the names
+# updating the names to be lower case, shorter, without spaces
 region_lookup$region <- str_to_lower(region_lookup$region)
 region_lookup$region <- str_replace_all(region_lookup$region, " and the ", "_")
 region_lookup$region <- str_replace_all(region_lookup$region, " of ", "_")
@@ -1321,15 +1347,22 @@ region_lookup$region <- str_replace_all(region_lookup$region, " ", "_")
 levels(as.factor(region_lookup$region))
 #create a list of regions
 region_list <- unique(region_lookup$region)
-#create a table, with a column per region
+# create a table, with a column per region
+# looping through, for each name in the region list
+# if it matches the region assign a 1 
 region_table <- sapply(region_list, function(region){
   ifelse(str_detect(region_lookup$region, region), 1, 0)
 })
-head(region_table)
+# checking it works as intended
+head(region_table, 20)
 head(region_lookup, 20)
+tail(region_table, 20)
+tail(region_lookup, 20)
+# adding the columns to the region lookup
 region_lookup <- region_lookup %>% cbind(as.data.frame(region_table))
 # save completed lookup for later
 save(region_lookup, file='rda/region_lookup.rda')
+# checking
 head(region_lookup, 50)
 tail(region_lookup, 20)
 head(geo_lookup)
@@ -1347,20 +1380,6 @@ length(levels(as.factor(geo_lookup$area_code)))
 #tidy up
 save(geo_lookup, file='rda/geo_lookup.rda')
 
-# load("rda/main.rda")
-# load("rda/main_tidy.rda")
-load("rda/geo_lookup.rda")
-#add to the data set
-main_new <- geo_lookup %>%
-  mutate(geo_code=geo_code_msoa) %>%
-  select(-geo_code_soa) %>% 
-  unique() %>%
-  right_join(main) %>%
-  select(-local_area, -geo_code_msoa)
-
-#number of local areas
-print("number of local areas")
-length(levels(as.factor(main_new$area_code)))
 #tidy up
 rm(geo_mapping, geo_url, area_update, index, i, newprefix, oldprefix, geo_lookup)
 rm(tmp, wales_mapping, wales_list,tmp2)
@@ -1386,7 +1405,6 @@ geo_lookup %>%
   ggtitle("Distribution of the outcome, y") +
   xlab("y, proportions of people in managerial or professional occupations") +
   ylab("count of numbers of MSOA areas")
-
 #tidy
 save(main_tidy, file='rda/main_tidy.rda')
 rm(main, main_new, main_tidy, geo_lookup, region_lookup, correlationmatrix, tmp)
@@ -1437,11 +1455,15 @@ data_cleanse <- function(data_set_name, geosize){
       select(-geo_code_soa, -geo_code_msoa) %>%
       unique()
   }
-  # modify the data with the geo info
+  # modify the data
   tmp <- data_set_name %>%
+    # add the occupation ratio
     mutate(occ_ratio = occupation_all/all_residents, .after = all_residents) %>%
+    # remove the unnecessary columns
     select(-occupation_all, -all_residents, -geo_type, -geo_name) %>%
+    # add the geographic region columns
     left_join(geo_lookup) %>%
+    # remove the unnecessary geography columns
     select(-local_area, -geo_code)
   #return the new object
   return(tmp)
@@ -1450,7 +1472,7 @@ data_cleanse <- function(data_set_name, geosize){
 #run on the test set and train set
 test_set_final <- data_cleanse(test_set, "msoa")
 train_set_final <- data_cleanse(train_set, "msoa")
-
+train_set_final3 <- data_cleanse(train_set, "msoa")
 #check
 names(test_set_final)
 names(train_set_final)
@@ -1458,6 +1480,8 @@ head(test_set)
 head(test_set_final)
 sum(is.na(train_set_final))
 test_set_final$wales
+# identical(train_set_final, train_set_final2)
+# sum(is.na(train_set_final2))
 #check the number of local areas is correct
 length(levels(as.factor(train_set_final$area_code)))
 # tidy up
@@ -1478,7 +1502,7 @@ rmse <- function(true_proportions, predicted_proportions){
 mu_hat <- mean(train_set_final$y)
 rmse_ave <- rmse(test_set_final$y, mu_hat)
 rmse_results <- tibble(method = "Mean of all locations", rmse = rmse_ave)
-rmse_results %>% knitr::kable()
+rmse_results %>% knitr::kable(caption="Initial baseline RMSE on an SOA with a mean estimate")
 
 
 #### modelling ####
@@ -1528,6 +1552,7 @@ names(train_set_final)
 correlationmatrix <- cor(train_set_final[,3:69])
 # image of correlation matrix
 heatmap(x = correlationmatrix, col = RColorBrewer::brewer.pal(11, "Spectral"))
+
 # find attributes that are highly corrected
 highlycorrelated <- findCorrelation(correlationmatrix, cutoff=0.8, exact = TRUE, names=TRUE)
 #listing the correlations for a specific one of the selected features, say, 2, and 3
@@ -1799,6 +1824,7 @@ train_final_norm <- train_final_nocat[1] %>%
   cbind(as.data.frame(lapply(train_final_nocat[2:59], normalise)))
 #check the data again
 identical(names(train_final_norm), names(train_final_nocat))
+print("after normalising")
 summary(train_final_norm[,4:7])
 
 #check with the new normalised training set
@@ -1911,6 +1937,7 @@ result_svm_train_smaller <-
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_svm_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
+#checking the variable importance, doesn't work
 # importance <- varImp(result_svm_train_smaller$train, scale=FALSE)
 
 # with the small training set
@@ -2370,7 +2397,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 #checking the variable importance
 importance <- varImp(result_glmboost_train_set_final$train, scale=FALSE)
-plot(importance, 20)
+plot(importance, 10)
 
 #checking tuning
 plot(result_glmboost_train_set_final$train)
@@ -2379,6 +2406,7 @@ plot(result_glmboost_train_set_final$train)
 importance_glmboost <- importance 
 save(result_glmboost_train_set_final, file="rda/result_glmboost_train_set_final.rda")
 save(importance_glmboost, file="rda/importance_glmboost.rda")
+# load("rda/importance_glmboost.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 # load("rda/result_glmboost_train_set_final.rda")
 rm(importance)
@@ -2430,6 +2458,7 @@ rmse_results %>% knitr::kable()
 # checking model tuning
 plot(result_avnnet_train_set_final$train)
 result_avnnet_train_set_final$train
+result_avnnet_train_set_final$train$finalModel
 
 #tidy 
 save(rmse_results, file="rda/rmse_results.rda")
