@@ -1,6 +1,14 @@
 #### ph125.9x Capstone choose your own project - UK census ####
 # Paul Ceely
 # 07/07/2020 to 30/08/2020
+################## set up #####################
+# this was developed and ran with RStudio:
+# RStudio Version 1.3.1073
+# platform       x86_64-apple-darwin17.0     
+# svn rev        78730                       
+# language       R                           
+# version.string R version 4.0.2 (2020-06-22)
+# with the latest packages installed
 #################### initial set up ##########################
 # setwd("~/Documents/study/Data-Science-R/ph125.9.Capstone/ChooseYourOwn")
 # set the working directory as the current directory of the file
@@ -12,13 +20,14 @@ getwd()
 dir.create("data")
 dir.create("rda")
 # set up libraries
-library(tidyverse)
-library(stringr)
-library(rvest)
-library(caret)
-library(RColorBrewer)
+if (!require('tidyverse')) install.packages('tidyverse'); library('tidyverse')
+if (!require('stringr')) install.packages('stringr'); library('stringr')
+if (!require('rvest')) install.packages('rvest'); library('rvest')
+if (!require('caret')) install.packages('caret'); library('caret')
+if (!require('RColorBrewer')) install.packages('RColorBrewer'); library('RColorBrewer')
 options(digits = 6)
-
+# tidy
+rm(current_directory)
 
 ############ Downloading the initial data #####################
 # <select aria-labelledby="area-type-label" name="geography" id="geography" class="">
@@ -41,8 +50,6 @@ options(digits = 6)
   #   </select>
 # <input type="submit" value="Download" class="btn" id="dwnBtn">
 
-# test geo type
-geographytype <- "TYPE480" #regions
 # function to create download file from nomis 
 nomis_census_csv <- function(censusdata, geographytype){
   # generate filename
@@ -65,11 +72,10 @@ nomis_census_csv <- function(censusdata, geographytype){
   download.file(nomis_session2$url, destfile)
 }
 
-# Initially, TYPE480 regions
+# Initially, TYPE480 regions to develop the code
 geographytype <- "TYPE480" #regions
-# then TYPE297 'super output areas - middle layer 2011
-geographytype <- "TYPE297" #super output areas - middle layer
-# geographytype <- "TYPE499" #countries
+# later using TYPE297 'super output areas - middle layer 2011
+# geographytype <- "TYPE297" #super output areas - middle layer
 #creating list of census tables to take
 censusdata_list <- c("ks101ew", "ks608ew","ks102ew", "ks201ew","ks501ew",
                      "ks103ew", "ks209ew", "ks105ew", "ks605ew", "qs203ew")
@@ -82,12 +88,13 @@ tmp <- lapply(censusdata_list, function(censusdata){
   #run the function to generate and download the file
   nomis_census_csv(censusdata, geographytype)
 })
-### tidy, take backup:
-rm(tmp, filled_form, nomis_form, nomis_session, nomis_session2, filename, nomis_url, nomis_url_root, censusdata_list, censusdata, time)
+### tidy:
+rm(tmp, censusdata_list)
+# rm(tmp, filled_form, nomis_form, nomis_session, nomis_session2, filename, nomis_url, nomis_url_root, censusdata_list, censusdata, time)
 
 ############ Import and clean the prediction #####################
 # options(digits = 3)
-# create function to read file
+# create function to read and load in csv data files
 ingest <- function(censustable, geography){
   print(paste("ingesting", censustable))
   # generate file name for loading
@@ -100,40 +107,69 @@ ingest <- function(censustable, geography){
   return(read_csv(filename))
 }
 
+# save data set with the geography type
+data_set_save <- function(data_set_name){
+  print(paste("saving", deparse(substitute(data_set_name))))
+  # generate file name for saving
+  filename <- paste(deparse(substitute(data_set_name)), 
+                    geographytype, 
+                    sep = "_") %>%
+    paste0(., ".rda") %>%
+    paste0("rda/", .)
+  print(paste("saving as file", filename))
+  # save the file to data
+  save(data_set_name, file=filename)
+}
+# this is a work around for a weird occasional bug
+# where in the previous function it saves with the name "data_set_name"
+data_set_save_rds <- function(data_set_name){
+  print(paste("saving", deparse(substitute(data_set_name))))
+  # generate file name for saving
+  filename <- paste(deparse(substitute(data_set_name)), 
+                    geographytype, 
+                    sep = "_") %>%
+    paste0(., ".rds") %>%
+    paste0("rda/", .)
+  print(paste("saving as file", filename))
+  # save the file to data
+  saveRDS(data_set_name, file=filename)
+}
+
 #load in occupation data
 # https://www.nomisweb.co.uk/census/2011/ks608ew
 # import the new table with occupation data
 data <- ingest("ks608ew", geographytype)
-names(data)
+# names(data)
+## initial version replaced by function
 # create mgr-prf ratios
-occupation <- data %>%
-  rename("geo_code" = "geography code", 
-         "geo_name" = "geography", 
-         "geo_type" = "Rural Urban", 
-         "occupation_all" = "Sex: All persons; Occupation: All categories: Occupation; measures: Value") %>%
-  rowwise() %>%
-  # calculate the ratiof of managers and professionals
-  mutate(y = 
-           (sum(across(contains("Sex: All persons; Occupation: 1. Managers"))) +
-              sum(across(contains("Sex: All persons; Occupation: 2. Professional "))) )
-         /occupation_all) %>% 
-  select(geo_name, geo_code, geo_type, y, occupation_all)
+# occupation <- data %>%
+#   rename("geo_code" = "geography code", 
+#          "geo_name" = "geography", 
+#          "geo_type" = "Rural Urban", 
+#          "occupation_all" = "Sex: All persons; Occupation: All categories: Occupation; measures: Value") %>%
+#   rowwise() %>%
+#   # calculate the ratiof of managers and professionals
+#   mutate(y = 
+#            (sum(across(contains("Sex: All persons; Occupation: 1. Managers"))) +
+#               sum(across(contains("Sex: All persons; Occupation: 2. Professional "))) )
+#          /occupation_all) %>% 
+#   select(geo_name, geo_code, geo_type, y, occupation_all)
 # occupation
 
 #now creating a function for repeatability
 occupation_target <- function(data){
   occupation <- data %>%
-    rename("geo_code" = "geography code", 
+    dplyr::rename("geo_code" = "geography code", 
            "geo_name" = "geography", 
            "geo_type" = "Rural Urban", 
            "occupation_all" = "Sex: All persons; Occupation: All categories: Occupation; measures: Value")  %>%
     rowwise() %>%
     # calculate the ratio of managers and professionals
-    mutate(y = 
+    dplyr::mutate(y = 
              (sum(across(contains("Sex: All persons; Occupation: 1. Managers"))) +
                 sum(across(contains("Sex: All persons; Occupation: 2. Professional "))) )
            /occupation_all) %>% 
-    select(geo_name, geo_code, geo_type, y, occupation_all)
+    dplyr::select(geo_name, geo_code, geo_type, y, occupation_all)
   #save file
   save(occupation, file='rda/occupation.rda')
 }
@@ -143,25 +179,31 @@ occupation_target(data)
 load('rda/occupation.rda')
 data_set <- occupation
 #tidy up
-save(data_set, file='rda/data_set.rda')
-rm(occupation, occup_tmp)
+# save(data_set, file='rda/data_set.rda')
+data_set_save(data_set)
+rm(occupation, data)
 
 ############ Import and clean the data #####################
 #step wise adding more tables from the census to put together potential predictors
-#load in residents and sex data
+#load in residents and sex/gender data
 data <- ingest("ks101ew", geographytype)
 names(data)
-colnames(data) <- 
-  c("date", "geo_name", "geo_code", "geo_type", "all_residents", "males", "females")
 sex <- data %>% 
-  select(2:7) %>%
-  mutate(female_ratio = females/all_residents)
+  # rename geo code column
+  rename("geo_code" = "geography code") %>%
+  rename("all_residents" = "Variable: All usual residents; measures: Value") %>%
+  rename("females" = "Variable: Females; measures: Value") %>%
+  mutate(female_ratio =  females/all_residents) %>%
+  select(geo_code, all_residents, female_ratio)
+names(sex)
 #adding to main data set
 data_set <- data_set %>%
-  left_join(sex) %>%
-  select(-females, -males)
-save(data_set, file='rda/data_set.rda')
-save(sex, file='rda/sex.rda')
+  left_join(sex)
+names(data_set)
+# tidy
+data_set_save(data_set)
+save(sex, file='rda/sex_orig.rda')
+rm(sex, data)
 
 # load in age data
 # https://www.nomisweb.co.uk/census/2011/ks102ew
@@ -180,24 +222,24 @@ age <- data %>%
   mutate("under_16" = age_0_4 + age_5_7 + age_8_9 + age_10_14 + age_15) %>%
   mutate("over_74" = age_75_84 + age_85_89 + age_90_over) %>%
   mutate("age_16_to_74" = all_residents - over_74 - under_16) %>%
-  mutate("age_20_to_64" = (age_16_to_74 - age_16_17 - age_18_19 - age_65_74)) %>%
-  select(geo_code, all_residents, age_16_to_74, age_20_to_64, age_median)
+  mutate("age_25_to_64" = (age_16_to_74 - age_16_17 - age_18_19 - age_20_24 - age_65_74)) %>%
+  select(geo_code, all_residents, age_16_to_74, age_25_to_64, age_median)
 names(age)
 data_set %>%
 #comparing to the all occupation number in the data set
   left_join(age) %>%
-  select(geo_name, occupation_all, all_residents, age_16_to_74, age_20_to_64) %>%
-  knitr::kable()
+  select(geo_name, occupation_all, all_residents, age_16_to_74, age_25_to_64) %>%
+  knitr::kable(caption="Comparison of resident numbers")
 age <- age %>%
-  select(-age_16_to_74, -age_20_to_64)
+  select(-age_16_to_74, -age_25_to_64)
 
 # rewriting as a function for the median age only
 age_predictors <- function(data){
   age <- data %>%
-    rename("geo_code" = "geography code", 
+    dplyr::rename("geo_code" = "geography code", 
            "all_residents" = "Age: All usual residents; measures: Value",
            "age_median" = "Age: Median Age; measures: Value") %>% 
-    select(geo_code, all_residents, age_median)
+    dplyr::select(geo_code, all_residents, age_median)
   save(age, file='rda/age.rda')
 }
 
@@ -210,36 +252,40 @@ data_set <- data_set %>%
   left_join(age)
 # show the ages, and the numbers
 names(data_set)
-save(data_set, file='rda/data_set.rda')
-rm(age)
-names(data_set)
+# tidy
+data_set_save(data_set)
+rm(age, data)
 
 
 # trying to find the source of the Occupation total of people
 # checking economic activity
+# loading the file with economic data
 nomis_census_csv("ks601ew", geographytype)
 data <- ingest("ks601ew", geographytype)
 names(data)
+# extract the resident numbers
 economic <- data %>%
   rename_at(vars(contains("Sex")), ~str_replace_all(., "; measures: Value", "")) %>%
   rename_at(vars(contains("Sex")), ~str_replace_all(., "Sex: All persons; Economic Activity: ", "")) %>%
   select(2:22) %>% select(-"Rural Urban") %>%
   rename("geo_code" = "geography code", "geo_name" = "geography")
-# names(economic)
+names(economic)
 #table comparing the numbers
 economic %>%
   left_join(data_set) %>%
-  select(-y, -female_ratio, -occ_ratio, -age_median) %>%
-  select(geo_name, geo_code, "All usual residents aged 16 to 74", 
-  "Economically active", "Economically active: In employment", 
-  "occupation_all", "all_residents") %>%
-  knitr::kable()
+  rename("all_res_16_74" = "All usual residents aged 16 to 74") %>%
+  rename("econ_active" = "Economically active") %>%
+  rename("employed" = "Economically active: In employment") %>%
+  select(geo_name, all_res_16_74, econ_active, employed,
+  occupation_all, all_residents) %>%
+  knitr::kable(caption="Comparison of resident numbers and employment")
 # tidy
-rm(economic, occupation)
+rm(economic, data)
+
 
 # next to load in the ethnicity data
 # https://www.nomisweb.co.uk/census/2011/lc2101ew
-# updating with age and ethnicity
+# downloading a new table, this time with age in addition to ethnicity
 nomis_census_csv("lc2101ew", geographytype)
 data <- ingest("lc2101ew", geographytype)
 names(data)
@@ -253,9 +299,9 @@ ethnicity_raw <- data %>%
   rename_at(vars(contains("Ethnic")), ~str_replace_all(., "Ethnic Group: ", "")) %>%
   # adding up the year groups
   rowwise() %>%
-  mutate("age25_64 All categories: Ethnic group" = sum(across(contains("All categories: Ethnic group"))), .before = "Age 25 to 49; All categories: Ethnic group") %>%
-  mutate("age25_64 White: English/Welsh/Scottish/Northern Irish/British" = sum(across(contains("White: English/Welsh/Scottish/Northern Irish/British"))), .before = "Age 25 to 49; All categories: Ethnic group") %>%
-  mutate("age25_64 White: Irish" = sum(across(contains("White: Irish"))), .before = "Age 25 to 49; All categories: Ethnic group") %>%
+  dplyr::mutate("age25_64 All categories: Ethnic group" = sum(across(contains("All categories: Ethnic group"))), .before = "Age 25 to 49; All categories: Ethnic group") %>%
+  dplyr::mutate("age25_64 White: English/Welsh/Scottish/Northern Irish/British" = sum(across(contains("White: English/Welsh/Scottish/Northern Irish/British"))), .before = "Age 25 to 49; All categories: Ethnic group") %>%
+  dplyr::mutate("age25_64 White: Irish" = sum(across(contains("White: Irish"))), .before = "Age 25 to 49; All categories: Ethnic group") %>%
   mutate("age25_64 White: Gypsy or Irish Traveller" = sum(across(contains("White: Gypsy or Irish Traveller"))), .before = "Age 25 to 49; All categories: Ethnic group") %>%
   mutate("age25_64 White: Other White" = sum(across(contains("White: Other White"))), .before = "Age 25 to 49; All categories: Ethnic group") %>% 
   mutate("age25_64 Mixed/multiple ethnic group: White and Black Caribbean" = sum(across(contains("Mixed/multiple ethnic group: White and Black Caribbean"))), .before = "Age 25 to 49; All categories: Ethnic group") %>%
@@ -280,14 +326,16 @@ ethnicity_raw <- data %>%
   rename_at(vars(contains(":")), ~str_replace_all(., ": ", "_")) %>%
   rename_at(vars(contains(" ")), ~str_replace_all(., " ", "_")) %>%
   rename_at(vars(contains("/")), ~str_replace_all(., "/", "_"))
+
+# tidy
 save(ethnicity_raw, file='rda/ethicity_raw.rda')
 names(ethnicity_raw)
 
 # reordering to identify which are the largest groups to retain
-load('rda/ethicity_raw.rda')
+# load('rda/ethicity_raw.rda')
 # make the geo code a rowname - all data is now a value
 ethnicity_ordered <- column_to_rownames(ethnicity_raw, var="geography_code")
-str(ethnicity_ordered)
+# str(ethnicity_ordered)
 # add a new row with column sums, so totals for each ethnicity
 ethnicity_ordered <- ethnicity_ordered %>%  
   rbind("total" = colSums(ethnicity_ordered))
@@ -296,96 +344,92 @@ ethnicity_ordered <- ethnicity_ordered[, order(-ethnicity_ordered[which(rownames
 # choose the first 11 columns, the first 11 ethnicities
 data.frame("ethnicity categories" = names(ethnicity_ordered)[2:12]) %>%  
   knitr::kable(caption="11 most prevalent ethnicities")
-names(ethnicity_ordered)
-midrule = "\\midrule"
-data.frame("ethnicity categories" = names(ethnicity_ordered)[2:12]) %>%  
-  knitr::kable(caption="11 most prevalent ethnicities", 
-               latex_options = "striped")
-# aggregating the other categories
-ethnicity_aggregated <- ethnicity_raw %>%
-  rename("all_25_64" = "age25_64_All_categories_Ethnic_group",
-  white_uk_25_64 = "age25_64_White_English_Welsh_Scottish_Northern_Irish_British") %>%
-  mutate("white_other_25_64" = age25_64_White_Other_White + age25_64_White_Gypsy_or_Irish_Traveller, .after = white_uk_25_64) %>%
-  select(-age25_64_White_Other_White, -age25_64_White_Gypsy_or_Irish_Traveller) %>% 
-  rename(indian_25_64 = "age25_64_Asian_Asian_British_Indian",
-  pakistani_25_64 = "age25_64_Asian_Asian_British_Pakistani",
-  black_african_25_64 = "age25_64_Black_African_Caribbean_Black_British_African",
-  asian_other_25_64 = "age25_64_Asian_Asian_British_Other_Asian") %>%
-  mutate("black_other_25_64" = age25_64_Black_African_Caribbean_Black_British_Caribbean + age25_64_Black_African_Caribbean_Black_British_Other_Black, .after = asian_other_25_64) %>%
-  select(-age25_64_Black_African_Caribbean_Black_British_Caribbean, -age25_64_Black_African_Caribbean_Black_British_Other_Black) %>%
-  rename(white_irish_25_64 = "age25_64_White_Irish",
-  chinese_25_64 = "age25_64_Asian_Asian_British_Chinese",
-  bangladeshi_25_64 = "age25_64_Asian_Asian_British_Bangladeshi") %>%
-  mutate(other_ethnicity_25_64 = age25_64_Other_ethnic_group_Any_other_ethnic_group +
-           age25_64_Mixed_multiple_ethnic_group_White_and_Black_Caribbean +
-           age25_64_Other_ethnic_group_Arab +
-           age25_64_Mixed_multiple_ethnic_group_Other_Mixed +
-           age25_64_Mixed_multiple_ethnic_group_White_and_Asian +
-           age25_64_Mixed_multiple_ethnic_group_White_and_Black_African, .after = bangladeshi_25_64) %>%
-  select(-age25_64_Other_ethnic_group_Any_other_ethnic_group, -age25_64_Mixed_multiple_ethnic_group_White_and_Black_Caribbean, -age25_64_Other_ethnic_group_Arab, -age25_64_Mixed_multiple_ethnic_group_Other_Mixed, -age25_64_Mixed_multiple_ethnic_group_White_and_Asian, -age25_64_Mixed_multiple_ethnic_group_White_and_Black_African) %>%
-  rename("geo_code" = "geography_code") %>%
-  rowwise() %>%
-  mutate(checksum_all2 = sum(across(4:14)), .after = checksum_all)
-# sum(ethnicity_aggregated$checksum_all2)
-# After this aggregation, I now need to divide by the sums of the rows, to have a normalised value for each of the ethnicities.
-ethnicity <- sweep(ethnicity_aggregated[,5:15], 1, rowSums(ethnicity_aggregated[,5:15]), FUN = "/")  %>%
-  cbind(ethnicity_aggregated[,1])
-#tmp, as a check
-ethn_orig <- ethnicity
+
+# original code, replaced by the function.  kept as a check of the function
+# # aggregating the other categories
+# ethnicity_aggregated <- ethnicity_raw %>%
+#   rename("all_25_64" = "age25_64_All_categories_Ethnic_group",
+#   white_uk_25_64 = "age25_64_White_English_Welsh_Scottish_Northern_Irish_British") %>%
+#   mutate("white_other_25_64" = age25_64_White_Other_White + age25_64_White_Gypsy_or_Irish_Traveller, .after = white_uk_25_64) %>%
+#   select(-age25_64_White_Other_White, -age25_64_White_Gypsy_or_Irish_Traveller) %>% 
+#   rename(indian_25_64 = "age25_64_Asian_Asian_British_Indian",
+#   pakistani_25_64 = "age25_64_Asian_Asian_British_Pakistani",
+#   black_african_25_64 = "age25_64_Black_African_Caribbean_Black_British_African",
+#   asian_other_25_64 = "age25_64_Asian_Asian_British_Other_Asian") %>%
+#   mutate("black_other_25_64" = age25_64_Black_African_Caribbean_Black_British_Caribbean + age25_64_Black_African_Caribbean_Black_British_Other_Black, .after = asian_other_25_64) %>%
+#   select(-age25_64_Black_African_Caribbean_Black_British_Caribbean, -age25_64_Black_African_Caribbean_Black_British_Other_Black) %>%
+#   rename(white_irish_25_64 = "age25_64_White_Irish",
+#   chinese_25_64 = "age25_64_Asian_Asian_British_Chinese",
+#   bangladeshi_25_64 = "age25_64_Asian_Asian_British_Bangladeshi") %>%
+#   mutate(other_ethnicity_25_64 = age25_64_Other_ethnic_group_Any_other_ethnic_group +
+#            age25_64_Mixed_multiple_ethnic_group_White_and_Black_Caribbean +
+#            age25_64_Other_ethnic_group_Arab +
+#            age25_64_Mixed_multiple_ethnic_group_Other_Mixed +
+#            age25_64_Mixed_multiple_ethnic_group_White_and_Asian +
+#            age25_64_Mixed_multiple_ethnic_group_White_and_Black_African, .after = bangladeshi_25_64) %>%
+#   select(-age25_64_Other_ethnic_group_Any_other_ethnic_group, -age25_64_Mixed_multiple_ethnic_group_White_and_Black_Caribbean, -age25_64_Other_ethnic_group_Arab, -age25_64_Mixed_multiple_ethnic_group_Other_Mixed, -age25_64_Mixed_multiple_ethnic_group_White_and_Asian, -age25_64_Mixed_multiple_ethnic_group_White_and_Black_African) %>%
+#   rename("geo_code" = "geography_code") %>%
+#   rowwise() %>%
+#   mutate(checksum_all2 = sum(across(4:14)), .after = checksum_all)
+# # sum(ethnicity_aggregated$checksum_all2)
+# # After this aggregation, I now need to divide by the sums of the rows, to have a normalised value for each of the ethnicities.
+# ethnicity <- sweep(ethnicity_aggregated[,5:15], 1, rowSums(ethnicity_aggregated[,5:15]), FUN = "/")  %>%
+#   cbind(ethnicity_aggregated[,1])
+# #tmp, as a check
+# ethn_orig <- ethnicity
 
 # creating a function for repeatability
 ethnicity_predictors <- function(data){
-  print("manipulating raw data")
+  # print("manipulating raw data")
   ethnicity_raw <- data %>%
     #keeping only the data relating to age 25 to 64
-    select(contains("geography code") | 
+    dplyr::select(contains("geography code") | 
              contains("Age 25 to 49") | 
              contains("Age 50 to 64") ) %>%
     # adding up the year groups
     rowwise() %>%
-    mutate("all_25_64" = 
+    dplyr::mutate("all_25_64" = 
              sum(across(contains("All categories: Ethnic group"))) ) %>%
-    mutate("white_uk_25_64" = 
+    dplyr::mutate("white_uk_25_64" = 
              sum(across(contains("White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
-    mutate("white_other_25_64" = 
+    dplyr::mutate("white_other_25_64" = 
              sum(across(contains("White: Other White"))) + 
              sum(across(contains("White: Gypsy or Irish Traveller"))) ) %>%
-    mutate("white_irish_25_64" = 
+    dplyr::mutate("white_irish_25_64" = 
              sum(across(contains("White: Irish"))) ) %>%
-    mutate("indian_25_64" = 
+    dplyr::mutate("indian_25_64" = 
              sum(across(contains("Asian/Asian British: Indian"))) ) %>%
-    mutate("pakistani_25_64" = 
+    dplyr::mutate("pakistani_25_64" = 
              sum(across(contains("Asian/Asian British: Pakistani"))) ) %>%
-    mutate("bangladeshi_25_64" = 
+    dplyr::mutate("bangladeshi_25_64" = 
              sum(across(contains("Asian/Asian British: Bangladeshi"))) ) %>%
-    mutate("other_ethnicity_25_64" = 
+    dplyr::mutate("other_ethnicity_25_64" = 
              sum(across(contains("Other ethnic group: Any other ethnic group"))) +
              sum(across(contains("Mixed/multiple ethnic group: White and Black Caribbean"))) +
              sum(across(contains("Other ethnic group: Arab"))) +
              sum(across(contains("Mixed/multiple ethnic group: Other Mixed"))) +
              sum(across(contains("Mixed/multiple ethnic group: White and Asian"))) +
              sum(across(contains("Mixed/multiple ethnic group: White and Black African")))) %>%
-    mutate("chinese_25_64" = 
+    dplyr::mutate("chinese_25_64" = 
              sum(across(contains("Asian/Asian British: Chinese"))) ) %>%
-    mutate("asian_other_25_64" =
+    dplyr::mutate("asian_other_25_64" =
              sum(across(contains("Asian/Asian British: Other Asian"))) ) %>%
-    mutate("black_other_25_64" = 
+    dplyr::mutate("black_other_25_64" = 
              sum(across(contains("Black/African/Caribbean/Black British: Caribbean"))) + 
              sum(across(contains("Black/African/Caribbean/Black British: Other Black"))) ) %>%
-    mutate("black_african_25_64" = 
+    dplyr::mutate("black_african_25_64" = 
              sum(across(contains("Black/African/Caribbean/Black British: African"))) ) %>%
-    rename("geo_code" = "geography code") %>%
+    dplyr::rename("geo_code" = "geography code") %>%
     # print(names(ethnicity)) %>%
-    select(contains("geo_code") | contains("25_64")) %>%
+    dplyr::select(contains("geo_code") | contains("25_64"))
     # print(names(ethnicity))
   # After this aggregation, I now need to divide by the sums of the rows, to have a normalised value for each of the ethnicities.
-  print("normalising the data")
+  # print("normalising the data")
   ethnicity <- sweep(ethnicity_raw[,3:13], 1, rowSums(ethnicity_raw[,3:13]), FUN = "/")  %>%
     cbind(ethnicity_raw[,1])
-  print("saving the file")
+  # print("saving the file")
   save(ethnicity, file='rda/ethnicity.rda')
 }
-
 #running the function on the data set
 ethnicity_predictors(data)
 #adding to main data set
@@ -397,49 +441,51 @@ data_set <- data_set %>%
   left_join(ethnicity)
 names(data_set)
 #save file, tidy up
-save(data_set, file='rda/data_set.rda')
-rm(ethnicity_aggregated, ethnicity_ordered, ethnicity_raw, ethnicity, ethn_orig)
-rm(ethnicity_aggregated, ethnicity_ordered, ethnicity_raw, ethnicity)
+data_set_save(data_set)
+rm(ethnicity_aggregated, ethnicity_ordered)
+rm(ethnicity_raw, ethnicity, ethn_orig, data)
+
 
 # next to load in the sex/gender data, for ages 25 to 64 
 # https://www.nomisweb.co.uk/census/2011/lc2101ew
 # using the ethnicity data, which includes gender
 data <- ingest("lc2101ew", geographytype)
-#creating the raw file
-sex_25_64 <- data %>%
-  #filtering all ethnicities
-  select(contains("Ethnic Group: All categories:") | 
-           contains("geography code") ) %>%
-  #filtering to the age groups in question
-  select(contains("Age 25 to 49") | 
-           contains("Age 50 to 64") | 
-           contains("geography code") ) %>%
-  #mutate to create the sums for comparison
-  rowwise() %>%
-  mutate("all_25_64"= sum(across(contains("Sex: All Persons")))) %>%
-  mutate("female_25_64"= sum(across(contains("Sex: Female")))) %>%
-  mutate("male_25_64"= sum(across(contains("Sex: Males")))) %>%
-  mutate("checksum" = female_25_64 + male_25_64) %>%
-  mutate(female_ratio_25_64 = female_25_64/all_25_64)%>% 
-  rename("geo_code" = "geography code") 
-#limit to the two columns necessary
-sex_25_64 <- sex_25_64 %>%
-  select(contains("female_ratio_25_64") | contains("geo_code") )
+# # original code commented out and retained for checking the function
+# #creating the raw file
+# sex_25_64 <- data %>%
+#   #filtering all ethnicities
+#   select(contains("Ethnic Group: All categories:") | 
+#            contains("geography code") ) %>%
+#   #filtering to the age groups in question
+#   select(contains("Age 25 to 49") | 
+#            contains("Age 50 to 64") | 
+#            contains("geography code") ) %>%
+#   #mutate to create the sums for comparison
+#   rowwise() %>%
+#   mutate("all_25_64"= sum(across(contains("Sex: All Persons")))) %>%
+#   mutate("female_25_64"= sum(across(contains("Sex: Female")))) %>%
+#   mutate("male_25_64"= sum(across(contains("Sex: Males")))) %>%
+#   mutate("checksum" = female_25_64 + male_25_64) %>%
+#   mutate(female_ratio_25_64 = female_25_64/all_25_64)%>% 
+#   rename("geo_code" = "geography code") 
+# #limit to the two columns necessary
+# sex_25_64 <- sex_25_64 %>%
+#   select(contains("female_ratio_25_64") | contains("geo_code") )
 
 #recreating as a function for reuse
 sex_predictors <- function(data){
   sex_25_64 <- data %>%
-    select(contains("Ethnic Group: All categories:") | 
+    dplyr::select(contains("Ethnic Group: All categories:") | 
              contains("geography code") ) %>%
-    select(contains("Age 25 to 49") | 
+    dplyr::select(contains("Age 25 to 49") | 
              contains("Age 50 to 64") | 
              contains("geography code") ) %>%
     rowwise() %>%
     #create the ratio necessary
-    mutate(female_ratio_25_64 = sum(across(contains("Sex: Female"))) / 
+    dplyr::mutate(female_ratio_25_64 = sum(across(contains("Sex: Female"))) / 
              sum(across(contains("Sex: All Persons")))) %>%
-    rename("geo_code" = "geography code")  %>%
-    select(contains("female_ratio_25_64") | contains("geo_code") )
+    dplyr::rename("geo_code" = "geography code")  %>%
+    dplyr::select(contains("female_ratio_25_64") | contains("geo_code") )
   save(sex_25_64, file='rda/sex_25_64.rda')
 }
 #running the function on the data set
@@ -451,11 +497,13 @@ data_set <- data_set %>%
   left_join(sex_25_64)
 # show the data set values
 names(data_set)
-# tidy from earlier female ratio for all ages
-# data_set <- data_set %>%
-#   select(-female_ratio)
-save(data_set, file='rda/data_set.rda')
-rm(sex, sex_25_64, sex_orig)
+# tidy up
+# tidy earlier female ratio for all ages
+data_set <- data_set %>%
+  select(-female_ratio)
+data_set_save(data_set)
+rm(sex, sex_25_64, data)
+
 
 # qualifications
 # https://www.nomisweb.co.uk/census/2011/lc5102ew
@@ -463,63 +511,62 @@ rm(sex, sex_25_64, sex_orig)
 nomis_census_csv("lc5102ew", geographytype)
 data <- ingest("lc5102ew", geographytype)
 names(data)
-# manipulate to be the 25 to 64 only
-qualifications_raw <- data %>%
-  #save only the 25 to 64 years
-  select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-  # tidy names to help understand them
-  rename_at(vars(contains("measures")), ~str_replace_all(., "; measures: Value", "")) %>%
-  rename("geo_code" = "geography code") %>%
-  rename_at(vars(contains("; Highest Level of Qualification: ")), ~str_replace_all(., "; Highest Level of Qualification: ", "_")) %>%
-  #calculate the sums for the retained predictors
-  rowwise() %>%
-  mutate("all_qual_25_64"= sum(across(contains("All categories: ")))) %>%
-  mutate("no_qual_25_64"= sum(across(contains("No qualifications")))) %>%
-  mutate("level1_25_64"= sum(across(contains("Level 1 qualification")))) %>%
-  mutate("level2_25_64"= sum(across(contains("Level 2 qualification")))) %>%
-  mutate("level3_25_64"= sum(across(contains("Level 3 qualification")))) %>%
-  mutate("level4_25_64"= sum(across(contains("Level 4 qualification")))) %>%
-  mutate("other_qual_25_64"= sum(across(contains("Other qualifications")))) %>%
-  mutate("apprentice_25_64"= sum(across(contains("Apprenticeship")))) %>%
-  select( contains("geo_code") | contains("25_64")) %>%
-  #checksum to check for errors
-  mutate(checksum_all = sum(across(contains("25_64"))) - all_qual_25_64, .after = geo_code)
-
-# normalise per area
-qualifications <- sweep(qualifications_raw[,4:10], 1, rowSums(qualifications_raw[,4:10]), FUN = "/")  %>%
-  cbind(qualifications_raw[,1])
-# checksum to ensure no errors/typos...
-# %>%
+# # retained original code, commented out
+# # manipulate to be the 25 to 64 only
+# qualifications_raw <- data %>%
+#   #save only the 25 to 64 years
+#   select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+#   # tidy names to help understand them
+#   rename_at(vars(contains("measures")), ~str_replace_all(., "; measures: Value", "")) %>%
+#   rename("geo_code" = "geography code") %>%
+#   rename_at(vars(contains("; Highest Level of Qualification: ")), ~str_replace_all(., "; Highest Level of Qualification: ", "_")) %>%
+#   #calculate the sums for the retained predictors
 #   rowwise() %>%
-#   mutate(checksum_all = sum(across(1:7)))
-
-#to check the function works
-# qual_orig <- qualifications
+#   mutate("all_qual_25_64"= sum(across(contains("All categories: ")))) %>%
+#   mutate("no_qual_25_64"= sum(across(contains("No qualifications")))) %>%
+#   mutate("level1_25_64"= sum(across(contains("Level 1 qualification")))) %>%
+#   mutate("level2_25_64"= sum(across(contains("Level 2 qualification")))) %>%
+#   mutate("level3_25_64"= sum(across(contains("Level 3 qualification")))) %>%
+#   mutate("level4_25_64"= sum(across(contains("Level 4 qualification")))) %>%
+#   mutate("other_qual_25_64"= sum(across(contains("Other qualifications")))) %>%
+#   mutate("apprentice_25_64"= sum(across(contains("Apprenticeship")))) %>%
+#   select( contains("geo_code") | contains("25_64")) %>%
+#   #checksum to check for errors
+#   mutate(checksum_all = sum(across(contains("25_64"))) - all_qual_25_64, .after = geo_code)
+# 
+# # normalise per area
+# qualifications <- sweep(qualifications_raw[,4:10], 1, rowSums(qualifications_raw[,4:10]), FUN = "/")  %>%
+#   cbind(qualifications_raw[,1])
+# # checksum to ensure no errors/typos...
+# # %>%
+# #   rowwise() %>%
+# #   mutate(checksum_all = sum(across(1:7)))
+# #to check the function works
+# # qual_orig <- qualifications
 
 #creating a function for repeatability
 qualifications_predictors <- function(data){
   qualifications_raw <- data %>%
     #save only the 25 to 64 years
-    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-    rename("geo_code" = "geography code") %>%
+    dplyr::select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+    dplyr::rename("geo_code" = "geography code") %>%
     #calculate the sums for the retained predictors
     rowwise() %>%
-    mutate("all_qual_25_64"= sum(across(contains("All categories: ")))) %>%
-    mutate("no_qual_25_64"= sum(across(contains("No qualifications")))) %>%
-    mutate("level1_25_64"= sum(across(contains("Level 1 qualification")))) %>%
-    mutate("level2_25_64"= sum(across(contains("Level 2 qualification")))) %>%
-    mutate("level3_25_64"= sum(across(contains("Level 3 qualification")))) %>%
-    mutate("level4_25_64"= sum(across(contains("Level 4 qualification")))) %>%
-    mutate("other_qual_25_64"= sum(across(contains("Other qualifications")))) %>%
-    mutate("apprentice_25_64"= sum(across(contains("Apprenticeship")))) %>%
-    select( contains("geo_code") | contains("25_64"))
+    dplyr::mutate("all_qual_25_64"= sum(across(contains("All categories: ")))) %>%
+    dplyr::mutate("no_qual_25_64"= sum(across(contains("No qualifications")))) %>%
+    dplyr::mutate("level1_25_64"= sum(across(contains("Level 1 qualification")))) %>%
+    dplyr::mutate("level2_25_64"= sum(across(contains("Level 2 qualification")))) %>%
+    dplyr::mutate("level3_25_64"= sum(across(contains("Level 3 qualification")))) %>%
+    dplyr::mutate("level4_25_64"= sum(across(contains("Level 4 qualification")))) %>%
+    dplyr::mutate("other_qual_25_64"= sum(across(contains("Other qualifications")))) %>%
+    dplyr::mutate("apprentice_25_64"= sum(across(contains("Apprenticeship")))) %>%
+    dplyr::select( contains("geo_code") | contains("25_64"))
   # normalise per area
   qualifications <- sweep(qualifications_raw[,3:9], 1, rowSums(qualifications_raw[,3:9]), FUN = "/")  %>%
     cbind(qualifications_raw[,1])
   #save file
   save(qualifications, file='rda/qualifications.rda')
 }
-
 #running the function on the data set
 qualifications_predictors(data)
 #adding to main data set
@@ -531,9 +578,8 @@ data_set <- data_set %>%
   left_join(qualifications)
 names(data_set)
 #tidy up
-save(data_set, file='rda/data_set.rda')
-rm(qualifications_raw, qualifications, qual_orig)
-rm(tmp, tmp2)
+data_set_save(data_set)
+rm(qualifications_raw, qualifications, qual_orig, data)
 
 
 # next marital status
@@ -542,59 +588,59 @@ rm(tmp, tmp2)
 nomis_census_csv("lc1101ew", geographytype)
 data <- ingest("lc1101ew", geographytype)
 names(data)
-# manipulate to be the 25 to 64 only
-marital_raw <- data %>%
-  #only all genders
-  select(contains("Sex: All persons;") | contains("geography code")) %>%
-  #save only the 25 to 64 years
-  select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-  rename("geo_code" = "geography code") %>%
-  #calculate for retained predictors
-  rowwise() %>%
-  mutate("all_marital_25_64"= sum(across(contains("All categories: ")))) %>%
-  mutate("single_25_64"= sum(across(contains("Marital Status: Single")))) %>%
-  mutate("married_25_64"= sum(across(contains("Marital Status: Married;")))) %>%
-  mutate("civil_25_64"= sum(across(contains("Marital Status: In a registered same-sex civil")))) %>%
-  mutate("separated_25_64"= sum(across(contains("Marital Status: Separated")))) %>%
-  mutate("divorced_25_64"= sum(across(contains("Marital Status: Divorced")))) %>%
-  mutate("widowed_25_64"= sum(across(contains("Marital Status: Widowed")))) %>%
-  select(contains("geo_code") | contains("25_64")) %>%
-  #checksum to confirm works ok
-  mutate(checksum_all = sum(across(contains("25_64"))) - all_marital_25_64, .after = geo_code)
-# normalise per area
-marital <- sweep(marital_raw[,4:9], 1, rowSums(marital_raw[,4:9]), FUN = "/")  %>%
-  cbind(marital_raw[,1])
-# checksum to ensure no errors/typos...
-# %>%
+# original code commented out, retained to check functions
+# # manipulate to be the 25 to 64 only
+# marital_raw <- data %>%
+#   #only all genders
+#   select(contains("Sex: All persons;") | contains("geography code")) %>%
+#   #save only the 25 to 64 years
+#   select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+#   rename("geo_code" = "geography code") %>%
+#   #calculate for retained predictors
 #   rowwise() %>%
-#   mutate(checksum_all = sum(across(1:6)))
-#to check the function works
-# marital_orig <- marital
+#   mutate("all_marital_25_64"= sum(across(contains("All categories: ")))) %>%
+#   mutate("single_25_64"= sum(across(contains("Marital Status: Single")))) %>%
+#   mutate("married_25_64"= sum(across(contains("Marital Status: Married;")))) %>%
+#   mutate("civil_25_64"= sum(across(contains("Marital Status: In a registered same-sex civil")))) %>%
+#   mutate("separated_25_64"= sum(across(contains("Marital Status: Separated")))) %>%
+#   mutate("divorced_25_64"= sum(across(contains("Marital Status: Divorced")))) %>%
+#   mutate("widowed_25_64"= sum(across(contains("Marital Status: Widowed")))) %>%
+#   select(contains("geo_code") | contains("25_64")) %>%
+#   #checksum to confirm works ok
+#   mutate(checksum_all = sum(across(contains("25_64"))) - all_marital_25_64, .after = geo_code)
+# # normalise per area
+# marital <- sweep(marital_raw[,4:9], 1, rowSums(marital_raw[,4:9]), FUN = "/")  %>%
+#   cbind(marital_raw[,1])
+# # checksum to ensure no errors/typos...
+# # %>%
+# #   rowwise() %>%
+# #   mutate(checksum_all = sum(across(1:6)))
+# #to check the function works
+# # marital_orig <- marital
 
 #creating a function for repeatability
 marital_predictors <- function(data){
   marital_raw <- data %>%
     #only all genders
-    select(contains("Sex: All persons;") | contains("geography code")) %>%
+    dplyr::select(contains("Sex: All persons;") | contains("geography code")) %>%
     #save only the 25 to 64 years
-    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-    rename("geo_code" = "geography code") %>%
+    dplyr::select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+    dplyr::rename("geo_code" = "geography code") %>%
     #calculate for retained predictors
     rowwise() %>%
-    mutate("all_marital_25_64"= sum(across(contains("All categories: ")))) %>%
-    mutate("single_25_64"= sum(across(contains("Marital Status: Single")))) %>%
-    mutate("married_25_64"= sum(across(contains("Marital Status: Married;")))) %>%
-    mutate("civil_25_64"= sum(across(contains("Marital Status: In a registered same-sex civil")))) %>%
-    mutate("separated_25_64"= sum(across(contains("Marital Status: Separated")))) %>%
-    mutate("divorced_25_64"= sum(across(contains("Marital Status: Divorced")))) %>%
-    mutate("widowed_25_64"= sum(across(contains("Marital Status: Widowed")))) %>%
-    select(contains("geo_code") | contains("25_64"))
+    dplyr::mutate("all_marital_25_64"= sum(across(contains("All categories: ")))) %>%
+    dplyr::mutate("single_25_64"= sum(across(contains("Marital Status: Single")))) %>%
+    dplyr::mutate("married_25_64"= sum(across(contains("Marital Status: Married;")))) %>%
+    dplyr::mutate("civil_25_64"= sum(across(contains("Marital Status: In a registered same-sex civil")))) %>%
+    dplyr::mutate("separated_25_64"= sum(across(contains("Marital Status: Separated")))) %>%
+    dplyr::mutate("divorced_25_64"= sum(across(contains("Marital Status: Divorced")))) %>%
+    dplyr::mutate("widowed_25_64"= sum(across(contains("Marital Status: Widowed")))) %>%
+    dplyr::select(contains("geo_code") | contains("25_64"))
   # normalise per area
   marital <- sweep(marital_raw[,3:8], 1, rowSums(marital_raw[,3:8]), FUN = "/")  %>%
     cbind(marital_raw[,1])
   save(marital, file='rda/marital.rda')
 }
-
 #running the function on the data set
 marital_predictors(data)
 #adding to main data set
@@ -604,9 +650,10 @@ load('rda/marital.rda')
 #adding to main data set
 data_set <- data_set %>%
   left_join(marital)
+names(data_set)
 #tidy up
-save(data_set, file='rda/data_set.rda')
-rm(marital, marital_raw, marital_orig)
+data_set_save(data_set)
+rm(marital, marital_raw, marital_orig, data)
 
 
 # next religion
@@ -615,66 +662,67 @@ rm(marital, marital_raw, marital_orig)
 nomis_census_csv("lc2107ew", geographytype)
 data <- ingest("lc2107ew", geographytype)
 names(data)
-# manipulate to be the 25 to 64 only
-religion_raw <- data %>%
-  # all genders
-  select(contains("Sex: All persons;") | contains("geography code")) %>%
-  #select the working age only
-  select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-  rename("geo_code" = "geography code") %>%
-  #calculate the sums across ages
-  rowwise() %>%
-  mutate("all_religion_25_64"= sum(across(contains("All categories:")))) %>%
-  mutate("christian_25_64"= sum(across(contains("Christian")))) %>%
-  mutate("buddhist_25_64"= sum(across(contains("Buddhist")))) %>%
-  mutate("hindu_25_64"= sum(across(contains("Hindu")))) %>%
-  mutate("jewish_25_64"= sum(across(contains("Jewish")))) %>%
-  mutate("muslim_25_64"= sum(across(contains("Muslim")))) %>%
-  mutate("sikh_25_64"= sum(across(contains("Sikh")))) %>%
-  mutate("other_25_64"= sum(across(contains("Other religion;")))) %>%
-  mutate("no_religion_25_64"= sum(across(contains("No religion;")))) %>%
-  mutate("religion_not_stated_25_64"= sum(across(contains("Religion not stated;")))) %>%
-  select(contains("geo_code") | contains("25_64")) %>%
-  #checksum to ensure everything covered
-  mutate(checksum_all = sum(across(contains("25_64"))) - all_religion_25_64, .after = geo_code)
-# checking for how many as a proportion
-religion_ordered <- column_to_rownames(religion_raw, var="geo_code")
-religion_ordered <- religion_ordered %>%  
-  rbind("total" = colSums(religion_ordered)) %>%
-  rbind("proportion" = 100*colSums(religion_ordered)/29615071) 
-religion_ordered <- religion_ordered[, order(-religion_ordered[which(rownames(religion_ordered) == 'total'), ]) ]
-names(religion_ordered)
-# normalise per area
-religion <- sweep(religion_raw[,4:12], 1, rowSums(religion_raw[,4:12]), FUN = "/")  %>%
-  cbind(religion_raw[,1])
-# checksum to ensure no errors/typos...
-# %>%
+# retaining original code for checking
+# # manipulate to be the 25 to 64 only
+# religion_raw <- data %>%
+#   # all genders
+#   select(contains("Sex: All persons;") | contains("geography code")) %>%
+#   #select the working age only
+#   select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+#   rename("geo_code" = "geography code") %>%
+#   #calculate the sums across ages
 #   rowwise() %>%
-#   mutate(checksum_all = sum(across(1:9)))
-#check function works
-# religion_orig <- religion
+#   mutate("all_religion_25_64"= sum(across(contains("All categories:")))) %>%
+#   mutate("christian_25_64"= sum(across(contains("Christian")))) %>%
+#   mutate("buddhist_25_64"= sum(across(contains("Buddhist")))) %>%
+#   mutate("hindu_25_64"= sum(across(contains("Hindu")))) %>%
+#   mutate("jewish_25_64"= sum(across(contains("Jewish")))) %>%
+#   mutate("muslim_25_64"= sum(across(contains("Muslim")))) %>%
+#   mutate("sikh_25_64"= sum(across(contains("Sikh")))) %>%
+#   mutate("other_25_64"= sum(across(contains("Other religion;")))) %>%
+#   mutate("no_religion_25_64"= sum(across(contains("No religion;")))) %>%
+#   mutate("religion_not_stated_25_64"= sum(across(contains("Religion not stated;")))) %>%
+#   select(contains("geo_code") | contains("25_64")) %>%
+#   #checksum to ensure everything covered
+#   mutate(checksum_all = sum(across(contains("25_64"))) - all_religion_25_64, .after = geo_code)
+# # checking for how many as a proportion
+# religion_ordered <- column_to_rownames(religion_raw, var="geo_code")
+# religion_ordered <- religion_ordered %>%  
+#   rbind("total" = colSums(religion_ordered)) %>%
+#   rbind("proportion" = 100*colSums(religion_ordered)/29615071) 
+# religion_ordered <- religion_ordered[, order(-religion_ordered[which(rownames(religion_ordered) == 'total'), ]) ]
+# names(religion_ordered)
+# # normalise per area
+# religion <- sweep(religion_raw[,4:12], 1, rowSums(religion_raw[,4:12]), FUN = "/")  %>%
+#   cbind(religion_raw[,1])
+# # checksum to ensure no errors/typos...
+# # %>%
+# #   rowwise() %>%
+# #   mutate(checksum_all = sum(across(1:9)))
+# #check function works
+# # religion_orig <- religion
 
 #creating a function for repeatability
 religion_predictors <- function(data){
   religion_raw <- data %>%
     # all genders
-    select(contains("Sex: All persons;") | contains("geography code")) %>%
+    dplyr::select(contains("Sex: All persons;") | contains("geography code")) %>%
     #select the working age only
-    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-    rename("geo_code" = "geography code") %>%
+    dplyr::select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+    dplyr::rename("geo_code" = "geography code") %>%
     #calculate the sums across ages
     rowwise() %>%
-    mutate("all_religion_25_64"= sum(across(contains("All categories:")))) %>%
-    mutate("christian_25_64"= sum(across(contains("Christian")))) %>%
-    mutate("buddhist_25_64"= sum(across(contains("Buddhist")))) %>%
-    mutate("hindu_25_64"= sum(across(contains("Hindu")))) %>%
-    mutate("jewish_25_64"= sum(across(contains("Jewish")))) %>%
-    mutate("muslim_25_64"= sum(across(contains("Muslim")))) %>%
-    mutate("sikh_25_64"= sum(across(contains("Sikh")))) %>%
-    mutate("other_25_64"= sum(across(contains("Other religion;")))) %>%
-    mutate("no_religion_25_64"= sum(across(contains("No religion;")))) %>%
-    mutate("religion_not_stated_25_64"= sum(across(contains("Religion not stated;")))) %>%
-    select(contains("geo_code") | contains("25_64"))
+    dplyr::mutate("all_religion_25_64"= sum(across(contains("All categories:")))) %>%
+    dplyr::mutate("christian_25_64"= sum(across(contains("Christian")))) %>%
+    dplyr::mutate("buddhist_25_64"= sum(across(contains("Buddhist")))) %>%
+    dplyr::mutate("hindu_25_64"= sum(across(contains("Hindu")))) %>%
+    dplyr::mutate("jewish_25_64"= sum(across(contains("Jewish")))) %>%
+    dplyr::mutate("muslim_25_64"= sum(across(contains("Muslim")))) %>%
+    dplyr::mutate("sikh_25_64"= sum(across(contains("Sikh")))) %>%
+    dplyr::mutate("other_25_64"= sum(across(contains("Other religion;")))) %>%
+    dplyr::mutate("no_religion_25_64"= sum(across(contains("No religion;")))) %>%
+    dplyr::mutate("religion_not_stated_25_64"= sum(across(contains("Religion not stated;")))) %>%
+    dplyr::select(contains("geo_code") | contains("25_64"))
   # normalise per area
   religion <- sweep(religion_raw[,3:11], 1, rowSums(religion_raw[,3:11]), FUN = "/")  %>%
     cbind(religion_raw[,1])
@@ -692,8 +740,8 @@ data_set <- data_set %>%
   left_join(religion)
 names(data_set)
 #tidy up
-save(data_set, file='rda/data_set.rda')
-rm(religion, religion_raw, religion_ordered, religion_orig)
+data_set_save(data_set)
+rm(religion, religion_raw, religion_ordered, religion_orig, data)
 
 
 #next household composition
@@ -702,81 +750,81 @@ rm(religion, religion_raw, religion_ordered, religion_orig)
 nomis_census_csv("lc1109ew", geographytype)
 data <- ingest("lc1109ew", geographytype)
 names(data)
-# manipulate to be the 25 and over only
-household_raw <- data %>%
-  # retain only the all sex (not female or male)
-  select(contains("Sex: All persons;") | contains("geography code")) %>%
-  select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 and over") | contains("geography code")) %>%
-  rename("geo_code" = "geography code") %>%
-  # rename so that it is easier to understand the breakdowns
-  rename_at(vars(contains("; Household Composition: ")), ~str_replace_all(., "; Household Composition: ", "_")) %>%
-  rename_at(vars(contains("Sex: All persons; Age: Age")), ~str_replace_all(., "Sex: All persons; Age: Age ", "Age ")) %>%
-  rename_at(vars(contains("; measures: Value")), ~str_replace_all(., "; measures: Value", "")) %>%
-  # retain the totals, the total amount, and the over 65 columns
-  select(contains("geo_code") | contains("All categories: Household composition") | contains(": Total") | contains("ged 65 and over")) %>%
-  # #checksum, make sure the totals add up for 25 to 34
-  # select(contains("geo_code") | contains("Age 25 to 34")) %>%
-  # rowwise() %>%
-  # mutate(checksum_25_34 = sum(across(contains("Age 25 to 34"))) - 
-  #          sum(across(contains("All categories: Household composition"))) - 
-  #          sum(across(contains("One family only: Total"))) -
-  #          sum(across(contains("Other household types: Other"))), .after = geo_code) %>%
-  # mutate(checksum_25_34_2 = 
-  #          sum(across(contains("One person household: Total"))) + 
-  #          sum(across(contains("Married or same-sex"))) + 
-  #          sum(across(contains("Cohabiting couple:"))) +
-  #          sum(across(contains("Lone parent:"))) +
-  #          sum(across(contains("Other household types: Total"))), .after = geo_code)
-  rowwise() %>%
-  # combine the age categories to create the predictors
-  mutate("all_household_25_64"= sum(across(contains("All categories:"))) -
-           sum(across(contains("One person household: Aged 65 and over"))) -
-           sum(across(contains("One family only: All aged 65 and over")))) %>%
-  mutate("oneperson_25_64"= sum(across(contains("One person household: Total"))) -
-           sum(across(contains("One person household: Aged 65 and over")))) %>%
-  mutate("marriedfamily_25_64"= sum(across(contains("Married")))) %>%
-  mutate("cohoabiting_25_64"= sum(across(contains("Cohabiting")))) %>%
-  mutate("loneparent_25_64"= sum(across(contains("Lone parent")))) %>%
-  mutate("otherhousehold_25_64"= sum(across(contains("Other household types: Total")))) %>%
-  select(contains("geo_code") | contains("25_64")) %>%
-  mutate(checksum_all = sum(across(contains("25_64"))) - all_household_25_64, .after = geo_code)
-# normalise per area
-household <- sweep(household_raw[,4:8], 1, rowSums(household_raw[,4:8]), FUN = "/")  %>%
-  cbind(household_raw[,1])
-# checksum to ensure no errors/typos...
-# %>%
+# retaining original code to check the function.
+# # manipulate to be the 25 and over only
+# household_raw <- data %>%
+#   # retain only the all sex (not female or male)
+#   select(contains("Sex: All persons;") | contains("geography code")) %>%
+#   select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 and over") | contains("geography code")) %>%
+#   rename("geo_code" = "geography code") %>%
+#   # rename so that it is easier to understand the breakdowns
+#   rename_at(vars(contains("; Household Composition: ")), ~str_replace_all(., "; Household Composition: ", "_")) %>%
+#   rename_at(vars(contains("Sex: All persons; Age: Age")), ~str_replace_all(., "Sex: All persons; Age: Age ", "Age ")) %>%
+#   rename_at(vars(contains("; measures: Value")), ~str_replace_all(., "; measures: Value", "")) %>%
+#   # retain the totals, the total amount, and the over 65 columns
+#   select(contains("geo_code") | contains("All categories: Household composition") | contains(": Total") | contains("ged 65 and over")) %>%
+#   # #checksum, make sure the totals add up for 25 to 34
+#   # select(contains("geo_code") | contains("Age 25 to 34")) %>%
+#   # rowwise() %>%
+#   # mutate(checksum_25_34 = sum(across(contains("Age 25 to 34"))) - 
+#   #          sum(across(contains("All categories: Household composition"))) - 
+#   #          sum(across(contains("One family only: Total"))) -
+#   #          sum(across(contains("Other household types: Other"))), .after = geo_code) %>%
+#   # mutate(checksum_25_34_2 = 
+#   #          sum(across(contains("One person household: Total"))) + 
+#   #          sum(across(contains("Married or same-sex"))) + 
+#   #          sum(across(contains("Cohabiting couple:"))) +
+#   #          sum(across(contains("Lone parent:"))) +
+#   #          sum(across(contains("Other household types: Total"))), .after = geo_code)
 #   rowwise() %>%
-#   mutate(checksum_all = sum(across(1:5)))
+#   # combine the age categories to create the predictors
+#   mutate("all_household_25_64"= sum(across(contains("All categories:"))) -
+#            sum(across(contains("One person household: Aged 65 and over"))) -
+#            sum(across(contains("One family only: All aged 65 and over")))) %>%
+#   mutate("oneperson_25_64"= sum(across(contains("One person household: Total"))) -
+#            sum(across(contains("One person household: Aged 65 and over")))) %>%
+#   mutate("marriedfamily_25_64"= sum(across(contains("Married")))) %>%
+#   mutate("cohoabiting_25_64"= sum(across(contains("Cohabiting")))) %>%
+#   mutate("loneparent_25_64"= sum(across(contains("Lone parent")))) %>%
+#   mutate("otherhousehold_25_64"= sum(across(contains("Other household types: Total")))) %>%
+#   select(contains("geo_code") | contains("25_64")) %>%
+#   mutate(checksum_all = sum(across(contains("25_64"))) - all_household_25_64, .after = geo_code)
+# # normalise per area
+# household <- sweep(household_raw[,4:8], 1, rowSums(household_raw[,4:8]), FUN = "/")  %>%
+#   cbind(household_raw[,1])
+# # checksum to ensure no errors/typos...
+# # %>%
+# #   rowwise() %>%
+# #   mutate(checksum_all = sum(across(1:5)))
 
 # rerunning as a function for reuse
 household_predictors <- function(data){
   household_raw <- data %>%
     # retain only the all sex (not female or male)
-    select(contains("Sex: All persons;") | contains("geography code")) %>%
+    dplyr::select(contains("Sex: All persons;") | contains("geography code")) %>%
     # retain only the specific age groups
-    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 and over") | contains("geography code")) %>%
-    rename("geo_code" = "geography code") %>%
+    dplyr::select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 and over") | contains("geography code")) %>%
+    dplyr::rename("geo_code" = "geography code") %>%
     # retain the totals, the total amount, and the over 65 columns
-    select(contains("geo_code") | contains("All categories: Household composition") | contains(": Total") | contains("ged 65 and over")) %>%
+    dplyr::select(contains("geo_code") | contains("All categories: Household composition") | contains(": Total") | contains("ged 65 and over")) %>%
     rowwise() %>%
     # combine the age categories to create the predictors
-    mutate("all_household_25_64"= sum(across(contains("All categories:"))) -
+    dplyr::mutate("all_household_25_64"= sum(across(contains("All categories:"))) -
              sum(across(contains("One person household: Aged 65 and over"))) -
              sum(across(contains("One family only: All aged 65 and over")))) %>%
-    mutate("oneperson_25_64"= sum(across(contains("One person household: Total"))) -
+    dplyr::mutate("oneperson_25_64"= sum(across(contains("One person household: Total"))) -
              sum(across(contains("One person household: Aged 65 and over")))) %>%
-    mutate("marriedfamily_25_64"= sum(across(contains("Married")))) %>%
-    mutate("cohoabiting_25_64"= sum(across(contains("Cohabiting")))) %>%
-    mutate("loneparent_25_64"= sum(across(contains("Lone parent")))) %>%
-    mutate("otherhousehold_25_64"= sum(across(contains("Other household types: Total")))) %>%
-    select(contains("geo_code") | contains("25_64")) %>%
-    mutate(checksum_all = sum(across(contains("25_64"))) - all_household_25_64, .after = geo_code)
+    dplyr::mutate("marriedfamily_25_64"= sum(across(contains("Married")))) %>%
+    dplyr::mutate("cohoabiting_25_64"= sum(across(contains("Cohabiting")))) %>%
+    dplyr::mutate("loneparent_25_64"= sum(across(contains("Lone parent")))) %>%
+    dplyr::mutate("otherhousehold_25_64"= sum(across(contains("Other household types: Total")))) %>%
+    dplyr::select(contains("geo_code") | contains("25_64")) %>%
+    dplyr::mutate(checksum_all = sum(across(contains("25_64"))) - all_household_25_64, .after = geo_code)
   # normalise per area
   household <- sweep(household_raw[,4:8], 1, rowSums(household_raw[,4:8]), FUN = "/")  %>%
     cbind(household_raw[,1])
   save(household, file='rda/household.rda')
 }
-
 #running the function on the data set
 household_predictors(data)
 #adding to main data set
@@ -785,8 +833,9 @@ data_set <- data_set %>%
   left_join(household)
 names(data_set)
 #tidy up
-save(data_set, file='rda/data_set.rda')
-rm(household, household_raw, household_ordered, household.org, houseshold_predictors)
+data_set_save(data_set)
+rm(household, data)
+# rm(household_ordered, household_raw, household.org, houseshold_predictors)
 
 
 #next Industry
@@ -795,56 +844,57 @@ rm(household, household_raw, household_ordered, household.org, houseshold_predic
 nomis_census_csv("lc6110ew", geographytype)
 data <- ingest("lc6110ew", geographytype)
 names(data)
-industry_raw <- data %>%
-  # retain only the specific age groups
-  select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-  rename("geo_code" = "geography code") %>%  
-# combine the age categories to create the predictors
-  rowwise() %>%
-  mutate("all_industry_25_64"= sum(across(contains("All categories:")))) %>%
-  mutate("industry_abde_25_64"= sum(across(contains("Industry: A, B, D, E ")))) %>%
-  mutate("manufacturing_25_64"= sum(across(contains("Manufacturing")))) %>%
-  mutate("construction_25_64"= sum(across(contains("Construction")))) %>%
-  mutate("industry_gi_25_64"= sum(across(contains("Industry: G, I")))) %>%
-  mutate("industry_hj_25_64"= sum(across(contains("Industry: H, J ")))) %>%
-  mutate("industry_klmn_25_64"= sum(across(contains("Industry: K, L, M, N")))) %>%
-  mutate("industry_opq_25_64"= sum(across(contains("Industry: O, P, Q ")))) %>%
-  mutate("Industry_rstu_25_64"= sum(across(contains("Industry: R, S, T, U ")))) %>%
-  select(contains("geo_code") | contains("25_64")) %>%
-  mutate(checksum_all = sum(across(contains("25_64"))) - all_industry_25_64, .after = geo_code)
-# normalise per area
-industry <- sweep(industry_raw[,4:11], 1, rowSums(industry_raw[,4:11]), FUN = "/")  %>%
-  cbind(industry_raw[,1]) 
-# checksum to ensure no errors/typos...
- # %>%
-  # rowwise() %>%
-  # mutate(checksum_all = sum(across(1:8)))
+# original code retained for checking
+# industry_raw <- data %>%
+#   # retain only the specific age groups
+#   select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+#   rename("geo_code" = "geography code") %>%  
+# # combine the age categories to create the predictors
+#   rowwise() %>%
+#   mutate("all_industry_25_64"= sum(across(contains("All categories:")))) %>%
+#   mutate("industry_abde_25_64"= sum(across(contains("Industry: A, B, D, E ")))) %>%
+#   mutate("manufacturing_25_64"= sum(across(contains("Manufacturing")))) %>%
+#   mutate("construction_25_64"= sum(across(contains("Construction")))) %>%
+#   mutate("industry_gi_25_64"= sum(across(contains("Industry: G, I")))) %>%
+#   mutate("industry_hj_25_64"= sum(across(contains("Industry: H, J ")))) %>%
+#   mutate("industry_klmn_25_64"= sum(across(contains("Industry: K, L, M, N")))) %>%
+#   mutate("industry_opq_25_64"= sum(across(contains("Industry: O, P, Q ")))) %>%
+#   mutate("Industry_rstu_25_64"= sum(across(contains("Industry: R, S, T, U ")))) %>%
+#   select(contains("geo_code") | contains("25_64")) %>%
+#   mutate(checksum_all = sum(across(contains("25_64"))) - all_industry_25_64, .after = geo_code)
+# # normalise per area
+# industry <- sweep(industry_raw[,4:11], 1, rowSums(industry_raw[,4:11]), FUN = "/")  %>%
+#   cbind(industry_raw[,1]) 
+# # checksum to ensure no errors/typos...
+#  # %>%
+#   # rowwise() %>%
+#   # mutate(checksum_all = sum(across(1:8)))
 
 # rerunning as a function for reuse
 industry_predictors <- function(data){
   industry_raw <- data %>%
     # retain only the specific age groups
-    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-    rename("geo_code" = "geography code") %>%  
+    dplyr::select(contains("Age 25 to 34") | contains("Age 35 to 49") | 
+             contains("Age 50 to 64") | contains("geography code")) %>%
+    dplyr::rename("geo_code" = "geography code") %>%  
     # combine the age categories to create the predictors
     rowwise() %>%
-    mutate("all_industry_25_64"= sum(across(contains("All categories:")))) %>%
-    mutate("industry_abde_25_64"= sum(across(contains("Industry: A, B, D, E ")))) %>%
-    mutate("manufacturing_25_64"= sum(across(contains("Manufacturing")))) %>%
-    mutate("construction_25_64"= sum(across(contains("Construction")))) %>%
-    mutate("industry_gi_25_64"= sum(across(contains("Industry: G, I")))) %>%
-    mutate("industry_hj_25_64"= sum(across(contains("Industry: H, J ")))) %>%
-    mutate("industry_klmn_25_64"= sum(across(contains("Industry: K, L, M, N")))) %>%
-    mutate("industry_opq_25_64"= sum(across(contains("Industry: O, P, Q ")))) %>%
-    mutate("Industry_rstu_25_64"= sum(across(contains("Industry: R, S, T, U ")))) %>%
-    select(contains("geo_code") | contains("25_64")) %>%
-    mutate(checksum_all = sum(across(contains("25_64"))) - all_industry_25_64, .after = geo_code)
+    dplyr::mutate("all_industry_25_64"= sum(across(contains("All categories:")))) %>%
+    dplyr::mutate("industry_abde_25_64"= sum(across(contains("Industry: A, B, D, E ")))) %>%
+    dplyr::mutate("manufacturing_25_64"= sum(across(contains("Manufacturing")))) %>%
+    dplyr::mutate("construction_25_64"= sum(across(contains("Construction")))) %>%
+    dplyr::mutate("industry_gi_25_64"= sum(across(contains("Industry: G, I")))) %>%
+    dplyr::mutate("industry_hj_25_64"= sum(across(contains("Industry: H, J ")))) %>%
+    dplyr::mutate("industry_klmn_25_64"= sum(across(contains("Industry: K, L, M, N")))) %>%
+    dplyr::mutate("industry_opq_25_64"= sum(across(contains("Industry: O, P, Q ")))) %>%
+    dplyr::mutate("Industry_rstu_25_64"= sum(across(contains("Industry: R, S, T, U ")))) %>%
+    dplyr::select(contains("geo_code") | contains("25_64")) %>%
+    dplyr::mutate(checksum_all = sum(across(contains("25_64"))) - all_industry_25_64, .after = geo_code)
   # normalise per area
   industry <- sweep(industry_raw[,4:11], 1, rowSums(industry_raw[,4:11]), FUN = "/")  %>%
     cbind(industry_raw[,1]) 
   save(industry, file='rda/industry.rda')
 }
-
 #running the function on the data set
 industry_predictors(data)
 #adding to main data set
@@ -853,8 +903,8 @@ data_set <- data_set %>%
   left_join(industry)
 names(data_set)
 #tidy up
-save(data_set, file='rda/data_set.rda')
-rm(industry, industry_raw, indust_orig)
+data_set_save(data_set)
+rm(industry, industry_raw, indust_orig, data)
 
 
 # next country of birth
@@ -863,79 +913,79 @@ rm(industry, industry_raw, indust_orig)
 nomis_census_csv("lc2103ew", geographytype)
 data <- ingest("lc2103ew", geographytype)
 names(data)
-# manipulate to be the 25 to 64 only
-country_raw <- data %>%
-  # retain only the all sex (not female or male)
-  select(contains("Sex: All persons;") | contains("geography code")) %>%
-  select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-  rename("geo_code" = "geography code") %>%
-  # rename so that it is easier to understand the breakdowns
-  rename_at(vars(contains("; Country of Birth: ")), ~str_replace_all(., "; Country of Birth: ", "_")) %>%
-  rename_at(vars(contains("Sex: All persons; Age: Age")), ~str_replace_all(., "Sex: All persons; Age: Age ", "Age ")) %>%
-  rename_at(vars(contains("; measures: Value")), ~str_replace_all(., "; measures: Value", "")) %>%
-  # #checksum, make sure the totals add up for 25 to 34
-  # select(contains("geo_code") | contains("Age 25 to 34")) %>%
-  # rowwise() %>%
-  # mutate(checksum_25_34 = 
-  #          sum(across(contains("United Kingdom: Total"))) +
-  #          sum(across(contains("Europe: Ireland"))) +
-  #          sum(across(contains("Other Europe: EU countries: Total"))) +
-  #          sum(across(contains("Other Europe: Rest of Europe"))) +
-  #          sum(across(contains("Africa"))) +
-  #          sum(across(contains("Middle East and Asia"))) +
-  #          sum(across(contains("The Americas and the Caribbean"))) +
-  #          sum(across(contains("Antarctica, Oceania"))), .after = geo_code)
-  #          , .after = geo_code)
-# combine the age categories to create the predictors
-  rowwise() %>%
-  mutate("all_country_25_64"= sum(across(contains("All categories:")))) %>%
-  mutate("uk_25_64"= sum(across(contains("United Kingdom: Total")))) %>%
-  mutate("eu_2001_25_64"= sum(across(contains("Other Europe: EU countries: Member countries in March 2001"))) + sum(across(contains("Europe: Ireland")))) %>%
-  mutate("eu_rest_25_64"= sum(across(contains("Other Europe: EU countries: Accession countries April 2001 to March 2011"))) ) %>%
-  mutate("europe_rest_25_64"= sum(across(contains("Other Europe: Rest of Europe")))) %>%
-  mutate("africa_25_64"= sum(across(contains("Africa")))) %>%
-  mutate("me_asia_25_64"= sum(across(contains("Middle East and Asia")))) %>%
-  mutate("americas_25_64"= sum(across(contains("The Americas and the Caribbean")))) %>%
-  mutate("other_country_25_64"= sum(across(contains("Antarctica, Oceania (including Australasia) and other")))) %>%
-  select(contains("geo_code") | contains("25_64")) %>%
-  mutate(checksum_all = sum(across(contains("25_64"))) - all_country_25_64, .after = geo_code)
-# normalise per area
-country <- sweep(country_raw[,4:11], 1, rowSums(country_raw[,4:11]), FUN = "/")  %>%
-  cbind(country_raw[,1])
-# checksum to ensure no errors/typos...
-# %>%
+# retain original for checking the functions
+# # manipulate to be the 25 to 64 only
+# country_raw <- data %>%
+#   # retain only the all sex (not female or male)
+#   select(contains("Sex: All persons;") | contains("geography code")) %>%
+#   select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+#   rename("geo_code" = "geography code") %>%
+#   # rename so that it is easier to understand the breakdowns
+#   rename_at(vars(contains("; Country of Birth: ")), ~str_replace_all(., "; Country of Birth: ", "_")) %>%
+#   rename_at(vars(contains("Sex: All persons; Age: Age")), ~str_replace_all(., "Sex: All persons; Age: Age ", "Age ")) %>%
+#   rename_at(vars(contains("; measures: Value")), ~str_replace_all(., "; measures: Value", "")) %>%
+#   # #checksum, make sure the totals add up for 25 to 34
+#   # select(contains("geo_code") | contains("Age 25 to 34")) %>%
+#   # rowwise() %>%
+#   # mutate(checksum_25_34 = 
+#   #          sum(across(contains("United Kingdom: Total"))) +
+#   #          sum(across(contains("Europe: Ireland"))) +
+#   #          sum(across(contains("Other Europe: EU countries: Total"))) +
+#   #          sum(across(contains("Other Europe: Rest of Europe"))) +
+#   #          sum(across(contains("Africa"))) +
+#   #          sum(across(contains("Middle East and Asia"))) +
+#   #          sum(across(contains("The Americas and the Caribbean"))) +
+#   #          sum(across(contains("Antarctica, Oceania"))), .after = geo_code)
+#   #          , .after = geo_code)
+# # combine the age categories to create the predictors
 #   rowwise() %>%
-#   mutate(checksum_all = sum(across(1:9)))
-# to check the function
-# country_orig <- country
-# country_raw_orig <- country_raw
+#   mutate("all_country_25_64"= sum(across(contains("All categories:")))) %>%
+#   mutate("uk_25_64"= sum(across(contains("United Kingdom: Total")))) %>%
+#   mutate("eu_2001_25_64"= sum(across(contains("Other Europe: EU countries: Member countries in March 2001"))) + sum(across(contains("Europe: Ireland")))) %>%
+#   mutate("eu_rest_25_64"= sum(across(contains("Other Europe: EU countries: Accession countries April 2001 to March 2011"))) ) %>%
+#   mutate("europe_rest_25_64"= sum(across(contains("Other Europe: Rest of Europe")))) %>%
+#   mutate("africa_25_64"= sum(across(contains("Africa")))) %>%
+#   mutate("me_asia_25_64"= sum(across(contains("Middle East and Asia")))) %>%
+#   mutate("americas_25_64"= sum(across(contains("The Americas and the Caribbean")))) %>%
+#   mutate("other_country_25_64"= sum(across(contains("Antarctica, Oceania (including Australasia) and other")))) %>%
+#   select(contains("geo_code") | contains("25_64")) %>%
+#   mutate(checksum_all = sum(across(contains("25_64"))) - all_country_25_64, .after = geo_code)
+# # normalise per area
+# country <- sweep(country_raw[,4:11], 1, rowSums(country_raw[,4:11]), FUN = "/")  %>%
+#   cbind(country_raw[,1])
+# # checksum to ensure no errors/typos...
+# # %>%
+# #   rowwise() %>%
+# #   mutate(checksum_all = sum(across(1:9)))
+# # to check the function
+# # country_orig <- country
+# # country_raw_orig <- country_raw
 
 # rerunning as a function for reuse
 country_predictors <- function(data){
   country_raw <- data %>%
     # retain only the all sex (not female or male)
-    select(contains("Sex: All persons;") | contains("geography code")) %>%
-    select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
-    rename("geo_code" = "geography code") %>%
+    dplyr::select(contains("Sex: All persons;") | contains("geography code")) %>%
+    dplyr::select(contains("Age 25 to 34") | contains("Age 35 to 49") | contains("Age 50 to 64") | contains("geography code")) %>%
+    dplyr::rename("geo_code" = "geography code") %>%
     # combine the age categories to create the predictors
     rowwise() %>%
-    mutate("all_country_25_64"= sum(across(contains("All categories:")))) %>%
-    mutate("uk_25_64"= sum(across(contains("United Kingdom: Total")))) %>%
-    mutate("eu_2001_25_64"= sum(across(contains("Other Europe: EU countries: Member countries in March 2001"))) + sum(across(contains("Europe: Ireland")))) %>%
-    mutate("eu_rest_25_64"= sum(across(contains("Other Europe: EU countries: Accession countries April 2001 to March 2011"))) ) %>%
-    mutate("europe_rest_25_64"= sum(across(contains("Other Europe: Rest of Europe")))) %>%
-    mutate("africa_25_64"= sum(across(contains("Africa")))) %>%
-    mutate("me_asia_25_64"= sum(across(contains("Middle East and Asia")))) %>%
-    mutate("americas_25_64"= sum(across(contains("The Americas and the Caribbean")))) %>%
-    mutate("other_country_25_64"= sum(across(contains("Antarctica, Oceania (including Australasia) and other")))) %>%
-    select(contains("geo_code") | contains("25_64")) %>%
-    mutate(checksum_all = sum(across(contains("25_64"))) - all_country_25_64, .after = geo_code)
+    dplyr::mutate("all_country_25_64"= sum(across(contains("All categories:")))) %>%
+    dplyr::mutate("uk_25_64"= sum(across(contains("United Kingdom: Total")))) %>%
+    dplyr::mutate("eu_2001_25_64"= sum(across(contains("Other Europe: EU countries: Member countries in March 2001"))) + sum(across(contains("Europe: Ireland")))) %>%
+    dplyr::mutate("eu_rest_25_64"= sum(across(contains("Other Europe: EU countries: Accession countries April 2001 to March 2011"))) ) %>%
+    dplyr::mutate("europe_rest_25_64"= sum(across(contains("Other Europe: Rest of Europe")))) %>%
+    dplyr::mutate("africa_25_64"= sum(across(contains("Africa")))) %>%
+    dplyr::mutate("me_asia_25_64"= sum(across(contains("Middle East and Asia")))) %>%
+    dplyr::mutate("americas_25_64"= sum(across(contains("The Americas and the Caribbean")))) %>%
+    dplyr::mutate("other_country_25_64"= sum(across(contains("Antarctica, Oceania (including Australasia) and other")))) %>%
+    dplyr::select(contains("geo_code") | contains("25_64")) %>%
+    dplyr::mutate(checksum_all = sum(across(contains("25_64"))) - all_country_25_64, .after = geo_code)
   # normalise per area
   country <- sweep(country_raw[,4:11], 1, rowSums(country_raw[,4:11]), FUN = "/")  %>%
     cbind(country_raw[,1])
   save(country, file='rda/country.rda')
 }
-
 #running the function on the data set
 country_predictors(data)
 #adding to main data set
@@ -946,17 +996,15 @@ data_set <- data_set %>%
   left_join(country)
 names(data_set)
 #tidy up
-save(data_set, file='rda/data_set.rda')
-rm(country, country_raw, country_raw_orig, country_orig)
+data_set_save(data_set)
+rm(country, country_raw, country_raw_orig, country_orig, data)
+rm(data_set_save, data_set_save_rds)
 
-# check the function
-# data_set_maincode <- data_set
+# check the functions in the next section
+data_set_maincode <- data_set
 
 
 ####### repeatable code ##########
-# geographytype <- "TYPE480" #regions
-# geographytype <- "TYPE297" #super output areas - middle layer
-# nomis_census_csv(censusdata, geographytype)
 
 #creating list of census tables to take
 censusdata_list <- c("ks608ew", "ks102ew", "lc2101ew", "lc2103ew","lc6110ew", "lc1109ew", "lc2107ew", "lc1101ew", "lc5102ew")
@@ -1120,22 +1168,35 @@ import_data <- function(geotype){
   return(data_set)
 }
 
+# test with the regional data vs the data created earlier
+geographytype <- "TYPE480" #regions
+# run the function to download the csv files for regions
+download_censusdata("TYPE480", censusdata_list)
+# run the function on the region imported data
+data_set <- import_data("TYPE480")
+#check function vs the main code
+names(data_set)
+names(data_set_maincode)
+identical(data_set, data_set_maincode)
+# true means that the functions are working
+
 # run the function to download the csv files
+geographytype="TYPE297"
 download_censusdata("TYPE297", censusdata_list)
 # run the function on the MSOA imported data
 data_set <- import_data("TYPE297")
-#check function vs the main code
-# names(data_set)
-# names(data_set_maincode)
-# identical(data_set, data_set_main2)
+# data_set_TYPE297 <- data_set
 
 #clean up
-rm(ingest, marital_predictors, country_predictors, occupation_target)
-rm(ethnicity_predictors, household_predictors, religion_predictors)
-rm(industry_predictors, sex_predictors)
-rm(qualifications_predictors, age_predictors)
+rm(data_set_maincode)
+# rm(ingest, marital_predictors, country_predictors, occupation_target)
+# rm(ethnicity_predictors, household_predictors, religion_predictors)
+# rm(industry_predictors, sex_predictors)
+# rm(qualifications_predictors, age_predictors)
+rm(censusdata_list)
 
 ############ Create main set, validation set #####################
+
 load("rda/data_set_TYPE297.rda")
 names(data_set)
 # Validation set will be 10% of the data
@@ -1159,7 +1220,6 @@ head(main)
 names(main)
 #check what is in the geo_type feature
 table(main$geo_type)
-
 #make the occupation in an area a ratio
 main <- main %>%
   mutate(occ_ratio = occupation_all/all_residents, .after = all_residents)
@@ -1170,13 +1230,12 @@ main %>%  ggplot(aes(y))  +
   ggtitle("Distribution of the outcome, y") +
   xlab("y, proportions of people in managerial or professional occupations") +
   ylab("count of numbers of MSOA areas")
-
 #table of key data points of the outcome y
 main %>% group_by(geo_type) %>%
   summarise(mean = mean(y), sd = sd(y), max = max(y), min = min(y)) %>%
   select(-geo_type)  %>%
   knitr::kable()
-
+# an alternate method, although less flexible for the markdown doc
 summary(main$y)
 
 #graph the geographic areas
@@ -1220,7 +1279,9 @@ main_tidy %>% group_by(feature) %>%
 ### calculating the correlation between features
 correlationmatrix <- cor(main[,7:63])
 # image of correlation matrix
-heatmap(x = correlationmatrix, col = RColorBrewer::brewer.pal(11, "Spectral"))
+heatmap(x = correlationmatrix, 
+        col = RColorBrewer::brewer.pal(11, "Spectral"), 
+        main="Heatmap of feature correlation with main data set")
 
 # find attributes that are highly corrected
 highlycorrelated <- findCorrelation(correlationmatrix, cutoff=0.8, exact = TRUE, names=TRUE)
@@ -1245,6 +1306,11 @@ main %>%  pivot_longer(
   ggtitle("Correlation of features") +
   xlab("proportion for 'uk_25_64' feature") +
   ylab("proportion for other features")
+
+# tidy
+rm(correlationmatrix, highlycorrelated)
+save(main_tidy, file='rda/main_tidy.rda')
+rm(main_tidy)
 
 #### geography ####
 # getting the mapping for the locations
@@ -1291,8 +1357,8 @@ geo_lookup$area_code <- as.integer(geo_lookup$area_code)
 head(geo_lookup$area_code)
 length(levels(as.factor(geo_lookup$area_code)))
 head(levels(as.factor(geo_lookup$area_code)))
-#tmp
-save(geo_lookup, file='rda/geo_lookup_tmp.rda')
+# tmp save fpr checking
+# save(geo_lookup, file='rda/geo_lookup_tmp.rda')
 
 #but this may not work for some algorithms
 # in addition creating a column per region
@@ -1324,6 +1390,7 @@ region_lookup <- region_mapping %>%
   unique()
 # check the regions, showing the blank
 levels(as.factor(region_lookup$region))
+table(region_lookup$region)
 head(region_lookup)
 # update empty fields to be "wales", where the local area starts with "W0"
 # create an index of areas starting with W
@@ -1334,11 +1401,13 @@ region_lookup[index,]
 region_lookup$region[index] <- "wales"
 # check the regions, now including wales
 levels(as.factor(region_lookup$region))
+table(region_lookup$region)
 #removing the blank line (Isles of Scilly)
 region_lookup <- region_lookup %>%
   filter(region != "")
 #confirm that the regions are now correct
 levels(as.factor(region_lookup$region))
+table(region_lookup$region)
 # updating the names to be lower case, shorter, without spaces
 region_lookup$region <- str_to_lower(region_lookup$region)
 region_lookup$region <- str_replace_all(region_lookup$region, " and the ", "_")
@@ -1367,6 +1436,7 @@ head(region_lookup, 50)
 tail(region_lookup, 20)
 head(geo_lookup)
 sum(is.na(region_lookup))
+sum(is.na(region_lookup))
 #add to the geo_lookup file
 geo_lookup <- geo_lookup %>%
   left_join(region_lookup) %>%
@@ -1382,7 +1452,6 @@ save(geo_lookup, file='rda/geo_lookup.rda')
 
 #tidy up
 rm(geo_mapping, geo_url, area_update, index, i, newprefix, oldprefix, geo_lookup)
-rm(tmp, wales_mapping, wales_list,tmp2)
 rm(region_lookup, region_mapping, region_table, region_list)
 
 #a quick visual check to see whether regions are relevant
@@ -1406,8 +1475,7 @@ geo_lookup %>%
   xlab("y, proportions of people in managerial or professional occupations") +
   ylab("count of numbers of MSOA areas")
 #tidy
-save(main_tidy, file='rda/main_tidy.rda')
-rm(main, main_new, main_tidy, geo_lookup, region_lookup, correlationmatrix, tmp)
+rm(geo_lookup, region_lookup)
 
 #### create test and train set ####
 load("rda/main.rda")
@@ -1423,9 +1491,9 @@ sum(is.na(train_set))
 ### tidy, take backup:
 save(train_set, file='rda/train_set.rda')
 save(test_set, file='rda/test_set.rda')
-rm(main, main_tidy, main_new, test_index)
-load("rda/test_set.rda")
-load("rda/train_set.rda")
+rm(main, test_index)
+# load("rda/test_set.rda")
+# load("rda/train_set.rda")
 
 
 #### data cleanse ####
@@ -1444,7 +1512,7 @@ data_cleanse <- function(data_set_name, geosize){
     print("msoa geolookup")
     geo_lookup <- geo_lookup %>%
       mutate(geo_code=geo_code_msoa)  %>%
-      select(-geo_code_soa, -geo_code_msoa) %>%
+      dplyr::select(-geo_code_soa, -geo_code_msoa) %>%
       unique()
   }
   #choose the soa geo_code
@@ -1452,19 +1520,21 @@ data_cleanse <- function(data_set_name, geosize){
     print("soa geolookup")
     geo_lookup <- geo_lookup %>%
       mutate(geo_code=geo_code_soa)  %>%
-      select(-geo_code_soa, -geo_code_msoa) %>%
+      dplyr::select(-geo_code_soa, -geo_code_msoa) %>%
       unique()
   }
   # modify the data
   tmp <- data_set_name %>%
     # add the occupation ratio
-    mutate(occ_ratio = occupation_all/all_residents, .after = all_residents) %>%
+    dplyr::mutate(occ_ratio = 
+                    occupation_all/all_residents, 
+                  .after = all_residents) %>%
     # remove the unnecessary columns
-    select(-occupation_all, -all_residents, -geo_type, -geo_name) %>%
+    dplyr::select(-occupation_all, -all_residents, -geo_type, -geo_name) %>%
     # add the geographic region columns
     left_join(geo_lookup) %>%
     # remove the unnecessary geography columns
-    select(-local_area, -geo_code)
+    dplyr::select(-local_area, -geo_code)
   #return the new object
   return(tmp)
 }
@@ -1472,7 +1542,7 @@ data_cleanse <- function(data_set_name, geosize){
 #run on the test set and train set
 test_set_final <- data_cleanse(test_set, "msoa")
 train_set_final <- data_cleanse(train_set, "msoa")
-train_set_final3 <- data_cleanse(train_set, "msoa")
+# train_set_final3 <- data_cleanse(train_set, "msoa")
 #check
 names(test_set_final)
 names(train_set_final)
@@ -1481,13 +1551,15 @@ head(test_set_final)
 sum(is.na(train_set_final))
 test_set_final$wales
 # identical(train_set_final, train_set_final2)
+# train_set_final2 <- train_set_final
 # sum(is.na(train_set_final2))
 #check the number of local areas is correct
 length(levels(as.factor(train_set_final$area_code)))
 # tidy up
 save(test_set_final, file="rda/test_set_final.rda")
 save(train_set_final, file="rda/train_set_final.rda")
-rm(test_set, train_set, geo_mapping, tmp, tmp1, i, newprefix, oldprefix, geo_lookup, main)
+rm(test_set, train_set, geo_lookup, main)
+rm(train_set_final, train_set_final2)
 
 #### baseline rmse and rmse function ####
 #load the test and train data
@@ -1503,10 +1575,11 @@ mu_hat <- mean(train_set_final$y)
 rmse_ave <- rmse(test_set_final$y, mu_hat)
 rmse_results <- tibble(method = "Mean of all locations", rmse = rmse_ave)
 rmse_results %>% knitr::kable(caption="Initial baseline RMSE on an SOA with a mean estimate")
+# tidy
+rm(mu_hat, rmse_ave)
 
 
 #### modelling ####
-
 # Before starting, reduce the size and remove the potentially difficult to handle categorical data on location.
 
 ##### feature selection & training sets ####
@@ -1524,7 +1597,7 @@ low_variability <- train_set_final %>%
   filter(mean <= "0.05" & sd <= "0.015" & max <= "0.15")
 low_variability %>%
   arrange(mean) %>%
-  knitr::kable()
+  knitr::kable(caption="Summary of features with low variability")
 # creating a list for later...
 low_variability_list <- low_variability %>% .$feature
 
@@ -1544,19 +1617,22 @@ train_set_final %>%
 #this is the location data
 load("rda/geo_lookup.rda")
 head(geo_lookup)
-categorical_features <- names(geo_lookup[4:13])
+names(geo_lookup)
+categorical_features <- names(geo_lookup[5:14])
 categorical_features
 
 #highly correlated
 names(train_set_final)
 correlationmatrix <- cor(train_set_final[,3:69])
 # image of correlation matrix
-heatmap(x = correlationmatrix, col = RColorBrewer::brewer.pal(11, "Spectral"))
+heatmap(x = correlationmatrix, 
+        col = RColorBrewer::brewer.pal(11, "Spectral"), 
+        main="Heatmap of feature correlaton with the train_set_final")
 
 # find attributes that are highly corrected
 highlycorrelated <- findCorrelation(correlationmatrix, cutoff=0.8, exact = TRUE, names=TRUE)
 #listing the correlations for a specific one of the selected features, say, 2, and 3
-#create index for the feature, and show highly correlated other features
+#create index for the feature, and show features highly correlated with feature 2 and 3 
 highlycorrelated[3]
 index <- str_which(names(data.frame(correlationmatrix)), highlycorrelated[4])
 correlationmatrix[,index][abs(correlationmatrix[,index]) > 0.7]
@@ -1566,13 +1642,13 @@ correlationmatrix[,index][abs(correlationmatrix[,index]) > 0.7]
 data.frame(correlationmatrix[,index][abs(correlationmatrix[,index]) > 0.7]) %>%
   rename("correlation" = starts_with("correlationmatri")) %>%
   rownames_to_column(var="feature name") %>%
-  knitr::kable()
+  knitr::kable(caption="Highly correlated features with the 'white_uk' feature")
 #tidy up
 save(highlycorrelated, file="rda/highlycorrelated.rda")
 save(categorical_features, file="rda/categorical_features.rda")
 save(low_variability_list, file="rda/low_variability_list.rda")
-rm(low_variability)
-rm(rmse_ave, index, train_set_lon, train_set_svm, low_variability)
+rm(low_variability, geo_lookup)
+rm(index, correlationmatrix)
 
 ## create smaller data set, and remove the geo_code column
 #remove low variability, highly correlated and categorical
@@ -1585,6 +1661,7 @@ train_small <- train_set_final %>%
   select(-all_of(highlycorrelated)) %>%
   select(-all_of(categorical_features))
 names(train_small)
+names(train_set_final)
 
 #make a smaller set, 15 columns and 1000 rows
 #sampling the 1000 observations
@@ -1596,16 +1673,18 @@ train_smaller <- train_small[index,]
 set.seed(1984, sample.kind="Rounding")
 #create the sample of 15 features
 index <- sample(1:(ncol(train_small)-1), 15, replace = FALSE)
-#add 1 and add back in the y values
+# as the first column is y, I need to keep that column
+# add 1 to all the index values, to retain the y values
 index2 <- append(1, (index+1))
 train_smaller <- train_smaller[,index2]
+
 #tidy up
-rm(index, index2, tmp, index3, train_tmp, train_matrix, low_variability)
+rm(index, index2)
 save(train_small, file="rda/train_small.rda")
 save(train_smaller, file="rda/train_smaller.rda")
+# load("rda/train_smaller.rda")
 names(train_small)
 names(train_smaller)
-
 # then the same but with categorical variables
 #remove low variability, highly correlated columns
 train_small_cat <- train_set_final %>%
@@ -1623,25 +1702,26 @@ train_smaller_cat <- train_small_cat[index,]
 set.seed(1984, sample.kind="Rounding")
 #create the sample of 15 features (random, but a manual check shows two categorical variables were chosen)
 index <- sample(1:(ncol(train_small_cat)-1), 15, replace = FALSE)
-#add one to include the y values
+# as the first column is y, I need to keep that column
+# add 1 to all the index values, to retain the y values
 index2 <- append(1, (index+1))
 train_smaller_cat <- train_smaller_cat[,index2]
 #tidy up
-rm(index, index2, tmp, index3, train_tmp, train_matrix, low_variability, train_small_orig)
+rm(index, index2)
 save(train_small_cat, file="rda/train_small_cat.rda")
 save(train_smaller_cat, file="rda/train_smaller_cat.rda")
 names(train_small_cat)
 names(train_smaller_cat)
 
+# create a full training set without the categorical features
 #remove categorical columns
 train_final_nocat <- train_set_final %>%
   select(-all_of(categorical_features))
 names(train_final_nocat)
-
 # tidy up
 save(train_final_nocat, file="rda/train_final_nocat.rda")
-rm(rmse_ave, mu_hat, index, correlationmatrix, low_variability)
-rm(train_small)
+rm(categorical_features, low_variability_list, highlycorrelated)
+
 
 #### function for running the models ####
 # creating a function to run the models, with different algorithms and data sets, with default settings.
@@ -1738,14 +1818,15 @@ important_features <- data.frame(importance$importance) %>%
   pull(feature)
 #taking the training data and making long form for a graph
 train_set_final %>%
-  #pivot to a long version with a row per feature/value
+  # tidy the names
   rename_at(vars(ends_with("25_64")), ~str_replace_all(., "_25_64", "")) %>%
+  #pivot to a long version with a row per feature/value
   pivot_longer(cols = !"y", 
                names_to = "feature", 
                values_to = "value") %>%
   filter(feature %in% important_features) %>% 
   ggplot(aes(y, value, col=feature))  + 
-  geom_point() +
+  geom_point(size=0.5) +
   facet_wrap(. ~feature,  scales = "free_y") +
   ggtitle("Outcome y for important features for GLM") +
   xlab("y, proportion of managerial & professional") +
@@ -1769,8 +1850,18 @@ result_knn_train_smaller <-
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_knn_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
-#checking the variable importance, mnot working
+#checking the variable importance, not working
 importance <- varImp(result_knn_train_smaller$train, scale=FALSE)
+# check the model
+result_knn_train_smaller$train$finalModel
+
+# with the small train set, less categorical
+result_knn_train_small <- 
+  results_train_method(train_small, test_set_final, "knn")
+# extract the rmse from the results
+rmse_results <- bind_rows(rmse_results, 
+                          tail(result_knn_train_small$results, 1))
+rmse_results %>% knitr::kable()
 
 # with the full train set, less categorical
 result_knn_train_final_nocat <- 
@@ -1783,7 +1874,7 @@ rmse_results %>% knitr::kable()
 # test if it will work with categorical feature the the smaller_cat
 result_knn_train_smaller_cat <- 
   results_train_method(train_smaller_cat, test_set_final, "knn")
-# knn does work...
+# knn does work, but very poor performance, not much better than the mean...
 
 #making a new small training set, without the age and area
 train_set_knn_small <- train_small %>%
@@ -1839,14 +1930,14 @@ rmse_results %>% knitr::kable()
 plot(result_knn_train_set_knn_final_nocat$train)
 # this shows 9 neighbours is not the bottom of the curve
 # trying more neighbours
-load("rda/train_knn.rda")
+# load("rda/train_knn.rda")
 train_knn <- train(y ~ ., method = "knn", data = train_set_knn_final_nocat, tuneLength=7)
 # train_knnsmaller <- train(y ~ ., method = "knn", data = train_smaller, preProcess = c("center","scale"), tuneLength=7)
 # 13 neighbours is best
 plot(train_knn)
 #making the prediction
 yhat_knn <- predict(train_knn, test_set_final)
-yhat_knn <- predict(train_knnsmaller, test_set_final)
+# yhat_knn <- predict(train_knnsmaller, test_set_final)
 # calculating the rmse
 rmse_knn <- rmse(test_set_final$y, yhat_knn)
 #adding to the RMSE list
@@ -1869,6 +1960,7 @@ rm(result_knn_train_set_knn_small)
 rm(result_knn_train_final_nocat, result_knn_train_smaller_cat)
 rm(train_knn, train_knnsmaller, train_set_knn_final_nocat)
 rm(rmse_knn, yhat_knn)
+rm(train_set_knn_small, train_final_norm, normalise)
 
 
 #### naive_bayes ####
@@ -1938,7 +2030,7 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_svm_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
 #checking the variable importance, doesn't work
-# importance <- varImp(result_svm_train_smaller$train, scale=FALSE)
+importance <- varImp(result_svm_train_smaller$train, scale=FALSE)
 
 # with the small training set
 result_svm_train_small <- 
@@ -1987,8 +2079,10 @@ result_gbm_train_smaller <-
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_gbm_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
-#checking the variable importance, doesn't work
-# importance <- varImp(result_gbm_train_smaller$train, scale=FALSE)
+#checking the variable importance
+importance <- varImp(result_gbm_train_smaller$train, scale=FALSE)
+plot(importance, 20)
+#checking the model
 result_gbm_train_smaller$train$finalModel
 plot(result_gbm_train_smaller$train)
 
@@ -2015,18 +2109,21 @@ result_gbm_train_set_final <-
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_gbm_train_set_final$results, 1))
 rmse_results %>% knitr::kable()
-
+#checking the variable importance
+importance <- varImp(result_gbm_train_set_final$train, scale=FALSE)
+plot(importance, 20)
 #checking the tuning, seems ok
 plot(result_gbm_train_set_final$train)
 
 #tidy
-importance_gbm <- 
-save("rda/importance_gbm.rda")
+importance_gbm <- importance
+save(importance_gbm, file="rda/importance_gbm.rda")
 save(result_gbm_train_set_final, file="rda/result_gbm_train_set_final.rda")
+# load("rda/result_gbm_train_set_final.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(result_gbm_train_smaller, result_gbm_train_small)
 rm(result_gbm_train_final_nocat, result_gbm_train_set_final)
-
+rm(importance_gbm, importance)
 
 #### Multilayer Perceptrons - mlp ####
 #
@@ -2068,8 +2165,8 @@ rm(result_gbm_train_final_nocat, result_gbm_train_set_final)
 
 #### Generalized Additive Model using Splines - gam ####
 # this uses the mgcv and nlme packages
-if (!require('mgcv')) install.packages('mgcv'); library('mgcv')
 if (!require('nlme')) install.packages('nlme'); library('nlme')
+if (!require('mgcv')) install.packages('mgcv'); library('mgcv')
 
 # with the smaller training set
 result_gam_train_smaller <- 
@@ -2084,13 +2181,12 @@ plot(importance, 20)
 result_gam_train_smaller$train$finalModel
 
 # with the small training set
-result_gam_train_small <- 
-  results_train_method(train_small, test_set_final, "gam")
+# result_gam_train_small <- results_train_method(train_small, test_set_final, "gam")
 # did not complete, took too long
 
 #tidy
 save(rmse_results, file="rda/rmse_results.rda")
-rm(result_gam_train_smaller)
+rm(result_gam_train_smaller, importance)
 
 
 #### Least Absolute Shrinkage and Selection Operator - lasso ####
@@ -2105,7 +2201,7 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_lasso_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
 #checking the variable importance, doesn't work
-# importance <- varImp(result_lasso_train_smaller$train, scale=FALSE)
+importance <- varImp(result_lasso_train_smaller$train, scale=FALSE)
 result_lasso_train_smaller$train$finalModel
 
 # with the small training set
@@ -2125,17 +2221,18 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_lasso_train_final_nocat$results, 1))
 rmse_results %>% knitr::kable()
 
-# does it work with categortical?
+# does it work with categorical?
 train_lasso <- train(y ~ ., method = "lasso", data = train_smaller_cat)
 #yes it does
 
 #compare glm and lasso predictions
 result_lasso_train_set_final <- 
   results_train_method(train_set_final, test_set_final, "lasso")
+# extract the rmse from the results
 rmse_results <- bind_rows(rmse_results,
                           tail(result_lasso_train_set_final$results, 1))
 result_lasso_train_set_final$results$rmse
-load("rda/result_lasso_train_set_final.rda")
+# load("rda/result_lasso_train_set_final.rda")
 load("rda/result_glm_train_set_final.rda")
 result_glm_train_set_final$results$rmse
 # check whether the RMSE are identical, or almost
@@ -2151,8 +2248,8 @@ all.equal(result_lasso_train_set_final$y_hat,
 # plotting graphs
 data.frame(result_lasso_train_set_final$y_hat,
            result_glm_train_set_final$y_hat) %>%
-  ggplot(aes(result_lasso_train_set_final$y_hat, 
-             result_glm_train_set_final$y_hat)) + 
+  ggplot(aes(x=result_lasso_train_set_final$y_hat, 
+             y=result_glm_train_set_final$y_hat)) + 
   geom_point() +
   geom_abline(slope = 1, intercept = 0, col="blue")  +
   ggtitle("Comparing the GLM and LASSO algorithms") +
@@ -2163,7 +2260,7 @@ data.frame(result_lasso_train_set_final$y_hat,
 save(result_lasso_train_set_final, file="rda/result_lasso_train_set_final.rda")
 rm(train_lasso, result_lasso_train_smaller, result_lasso_train_small) 
 rm(result_lasso_train_set_final, result_lasso_train_final_nocat)
-rm(train_lasso)
+rm(result_glm_train_set_final)
 save(rmse_results, file="rda/rmse_results.rda")
 
 
@@ -2179,7 +2276,7 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_pcr_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
 #checking the variable importance, doesn't work
-# importance <- varImp(result_pcr_train_smaller$train, scale=FALSE)
+importance <- varImp(result_pcr_train_smaller$train, scale=FALSE)
 result_pcr_train_smaller$train$modelInfo
 plot(result_pcr_train_smaller$train)
 
@@ -2208,7 +2305,6 @@ rmse_results %>% knitr::kable()
 #tidy
 rm(result_pcr_train_smaller, result_pcr_train_small)
 rm(result_pcr_train_smaller_cat, result_pcr_train_set_final)
-rm(result_pcr_train_top28, result_pcr_train_final_nocat)
 save(rmse_results, file="rda/rmse_results.rda")
 
 
@@ -2224,7 +2320,7 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_bayesglm_train_smaller$results, 1))
 rmse_results %>% knitr::kable()
 #checking the variable importance, doesn't work
-# importance <- varImp(result_bayesglm_train_smaller$train, scale=FALSE)
+importance <- varImp(result_bayesglm_train_smaller$train, scale=FALSE)
 result_bayesglm_train_smaller$train$finalModel
 
 # with the small training set
@@ -2259,12 +2355,11 @@ identical(result_bayesglm_train_set_final$y_hat,
           result_glm_train_set_final$y_hat)
 all.equal(result_bayesglm_train_set_final$y_hat,
           result_glm_train_set_final$y_hat)
-y_hat_bayesglm <- result_bayesglm_train_set_final$y_hat
 # plotting graphs
 data.frame(result_bayesglm_train_set_final$y_hat,
            result_glm_train_set_final$y_hat) %>%
-  ggplot(aes(result_bayesglm_train_set_final$y_hat, 
-             result_glm_train_set_final$y_hat)) + 
+  ggplot(aes(x=result_bayesglm_train_set_final$y_hat, 
+             y=result_glm_train_set_final$y_hat)) + 
   geom_point() +
   geom_abline(slope = 1, intercept = 0, col="blue")  +
   ggtitle("Comparing the BayesGLM and GLM algorithms") +
@@ -2272,10 +2367,10 @@ data.frame(result_bayesglm_train_set_final$y_hat,
   ylab("GLM predictions")
 
 #tidy
-rm(y_hat_bayesglm, result_bayesglm_train_smaller)
+rm(result_bayesglm_train_smaller)
 rm(result_bayesglm_train_set_final, result_bayesglm_train_small)
+rm(result_glm_train_set_final)
 save(rmse_results, file="rda/rmse_results.rda")
-save(result_bayesglm_train_set_final, file="rda/result_bayesglm_train_set_final.rda")
 
 
 #### Generalized Additive Model using LOESS - gamLoess ####
@@ -2295,13 +2390,13 @@ plot(importance, 20)
 result_gamloess_train_smaller$train
 
 # with the small training set
-result_gamloess_train_small <- 
-  results_train_method(train_small, test_set_final, "gamLoess")
+# result_gamloess_train_small <- 
+  # results_train_method(train_small, test_set_final, "gamLoess")
 # did not complete
 
 #tidy
 save(rmse_results, file="rda/rmse_results.rda")
-rm(result_gamloess_train_smaller)
+rm(result_gamloess_train_smaller, importance)
 
 
 #### Random Forest - ranger ####
@@ -2340,7 +2435,6 @@ rmse_results %>% knitr::kable()
 plot(result_ranger_train_set_final$train)
 
 #tidy
-load("rda/result_ranger_train_set_final.rda")
 save(result_ranger_train_set_final, file="rda/result_ranger_train_set_final.rda")
 rm(result_ranger_train_set_final, result_ranger_train_small) 
 rm(result_ranger_train_smaller)
@@ -2377,17 +2471,6 @@ result_glmboost_train_smaller_cat <-
   results_train_method(train_smaller_cat, test_set_final, "glmboost")
 # it works
 
-# with the full training set, no categorical features
-result_glmboost_train_final_nocat <- 
-  results_train_method(train_final_nocat, test_set_final, "glmboost")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_glmboost_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
-#checking the variable importance
-importance <- varImp(result_glmboost_train_final_nocat$train, scale=FALSE)
-plot(importance, 20)
-
 # with the full training set
 result_glmboost_train_set_final <- 
   results_train_method(train_set_final, test_set_final, "glmboost")
@@ -2409,10 +2492,9 @@ save(importance_glmboost, file="rda/importance_glmboost.rda")
 # load("rda/importance_glmboost.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 # load("rda/result_glmboost_train_set_final.rda")
-rm(importance)
+rm(importance, importance_glmboost)
 rm(result_glmboost_train_smaller, result_glmboost_train_small) 
-rm(result_glmboost_train_smaller_cat, result_glmboost_train_final_nocat) 
-rm(result_glmboost_train_set_final)
+rm(result_glmboost_train_smaller_cat, result_glmboost_train_set_final) 
 
 
 #### Model Averaged Neural Network - avNNet ####
@@ -2439,13 +2521,10 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_avnnet_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
-# with the full train set, less categorical
-result_avnnet_train_final_nocat <- 
-  results_train_method(train_final_nocat, test_set_final, "avNNet")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_avnnet_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
+#test the categorical
+result_avnnet_train_smaller_cat <- 
+  results_train_method(train_smaller_cat, test_set_final, "avNNet")
+# it works
 
 # with the full train set
 result_avnnet_train_set_final <- 
@@ -2463,9 +2542,9 @@ result_avnnet_train_set_final$train$finalModel
 #tidy 
 save(rmse_results, file="rda/rmse_results.rda")
 save(result_avnnet_train_set_final, file="rda/result_avnnet_train_set_final.rda")
-load("rda/result_avnnet_train_set_final.rda")
+# load("rda/result_avnnet_train_set_final.rda")
 rm(result_avnnet_train_small, result_avnnet_train_smaller) 
-rm(result_avnnet_train_final_nocat, result_avnnet_train_set_final)
+rm(result_avnnet_train_smaller_cat, result_avnnet_train_set_final)
 
 
 #### Support Vector Machines with Linear Kernel	- svmLinear2 ####
@@ -2490,13 +2569,10 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_svm2_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
-# with the full train set, less categorical
-result_svm2_train_final_nocat <- 
-  results_train_method(train_final_nocat, test_set_final, "svmLinear2")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_svm2_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
+#test the categorical
+result_svm2_train_smaller_cat <- 
+  results_train_method(train_smaller_cat, test_set_final, "svmLinear2")
+# it works
 
 # seems similar to the svmlinear
 # checking...
@@ -2509,7 +2585,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 
 #comparing...
-load("rda/result_svm2_train_set_final.rda")
+# load("rda/result_svm2_train_set_final.rda")
 load("rda/result_svm_train_set_final.rda")
 result_svm2_train_set_final$results$rmse
 result_svm_train_set_final$results$rmse
@@ -2528,8 +2604,8 @@ all.equal(result_svm2_train_set_final$y_hat,
 save(result_svm2_train_set_final, file="rda/result_svm2_train_set_final.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(result_svm2_train_smaller, result_svm2_train_small)
-rm(result_svm2_train_final_nocat, result_svm2_train_set_final)
-rm(y_hat_svm, y_hat_svm2)
+rm(result_svm2_train_smaller_cat, result_svm2_train_set_final)
+rm(result_svm_train_set_final)
 
 
 ##### Support Vector Machines with Linear Kernel - svmRadial #####
@@ -2554,13 +2630,10 @@ rmse_results <- bind_rows(rmse_results,
                           tail(result_svmradial_train_small$results, 1))
 rmse_results %>% knitr::kable()
 
-# with the full train set, less categorical
-result_svmradial_train_final_nocat <- 
-  results_train_method(train_final_nocat, test_set_final, "svmRadial")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_svmradial_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
+#test the categorical
+result_svmradial_train_smaller_cat <- 
+  results_train_method(train_smaller_cat, test_set_final, "svmRadial")
+# it works
 
 # with the full train set
 result_svmradial_train_set_final <- 
@@ -2578,10 +2651,11 @@ result_svmradial_train_set_final$train
 save(result_svmradial_train_set_final, file="rda/result_svmradial_train_set_final.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(result_svmradial_train_smaller, result_svmradial_train_small)
-rm(result_svmradial_train_final_nocat)
+rm(result_svmradial_train_smaller_cat)
 rm(result_svmradial_train_set_final)
 
-##### ensemble   #####
+
+##### ensemble #####
 load("rda/rmse_results.rda")
 # Identify the leading models, the top 5
 rmse_results %>%
@@ -2598,13 +2672,11 @@ load("rda/result_ranger_train_set_final.rda")
 
 # create table of y_hat
 y_hat_ens_table <- 
-  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
-  cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
+  data.frame(result_glm_train_set_final$y_hat) %>%
   cbind(data.frame(result_gbm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
   cbind(data.frame(result_ranger_train_set_final$y_hat)) %>%
-  select(-number) %>%
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 #test against the actual values
@@ -2621,16 +2693,13 @@ save(y_hat_ens_table, file="rda/y_hat_ens_table.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(y_hat_ens_table)
 rm(result_gbm_train_set_final, result_ranger_train_set_final)
-rm(result_avnnet_train_set_final)
 
 #### ensemble 2 ####
 #a smaller ensemble of the three best models
 y_hat_ens_table2 <- 
-  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
-  cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
+  data.frame(result_glm_train_set_final$y_hat) %>%
   cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
-  select(-number) %>%
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 #test against the actual values
@@ -2644,14 +2713,13 @@ rmse_results %>% tail(5) %>% knitr::kable()
 save(y_hat_ens_table2, file="rda/y_hat_ens_table2.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(y_hat_ens_table2, rmse_ens, y_hat_ens_table)
-rm(result_avnnet_train_set_final, result_gbm_train_set_final)
 
 
 #### feature prioritisation ####
 # other promising models, looks like GAM, GAMloess and KNN could be interesting
 rmse_results %>%
   filter(str_detect(method, "smaller") ) %>%
-  arrange(rmse) %>% head(15) %>% knitr::kable()
+  arrange(rmse) %>% head(10) %>% knitr::kable()
 
 # using GLM, GBM, GLM boost to rank features
 load("rda/importance_gbm.rda")
@@ -2663,7 +2731,7 @@ gbm_rank <- importance_gbm$importance %>%
   arrange(desc(Overall)) %>% 
   cbind(data.frame(gbm_rank = 1:length(importance_gbm$importance$Overall))) %>%
   mutate("gbm_overall" = Overall/max(Overall)) %>% 
-  select(-Overall)
+  dplyr::select(-Overall)
 head(gbm_rank)
 #create ranking for glm algorithm, with normalised score
 glm_rank <- importance_glm$importance %>%
@@ -2671,7 +2739,7 @@ glm_rank <- importance_glm$importance %>%
   arrange(desc(Overall)) %>% 
   cbind(data.frame(glm_rank = 1:length(importance_glm$importance$Overall))) %>%
   mutate("glm_overall" = Overall/max(Overall)) %>% 
-  select(-Overall)
+  dplyr::select(-Overall)
 head(glm_rank)
 #create ranking for glmboost algorithm, with normalised score
 glmboost_rank <- importance_glmboost$importance %>%
@@ -2679,8 +2747,8 @@ glmboost_rank <- importance_glmboost$importance %>%
   arrange(desc(Overall)) %>% 
   cbind(data.frame(glmboost_rank = 1:length(importance_glmboost$importance$Overall))) %>%
   mutate("glmboost_overall" = Overall/max(Overall)) %>% 
-  select(-Overall)
-
+  dplyr::select(-Overall)
+head(glmboost_rank)
 # combined ranking table, with mean, and reordered
 feature_rank <- glm_rank %>%
   left_join(gbm_rank) %>%
@@ -2688,28 +2756,31 @@ feature_rank <- glm_rank %>%
   mutate(mean_overall = (glm_overall+gbm_overall+glmboost_overall)/3, .after = feature) %>%
   mutate(mean_rank = (glm_rank+gbm_rank+glmboost_rank)/3, .after = feature) 
 # arrange by mean ranking and display top 9
-feature_rank %>% select(feature, mean_rank, mean_overall) %>%
+feature_rank %>% dplyr::select(feature, mean_rank, mean_overall) %>%
   arrange(mean_rank) %>% head(9) %>% knitr::kable()
 # arrange by mean score and display top 9
-feature_rank %>% select(feature, mean_rank, mean_overall) %>%
+feature_rank %>% dplyr::select(feature, mean_rank, mean_overall) %>%
   arrange(desc(mean_overall)) %>% head(9) %>% knitr::kable()
 
 # plotting the top 9
-load("rda/feature_rank.rda")
-load("rda/train_set_final.rda")
+# load("rda/feature_rank.rda")
+# load("rda/train_set_final.rda")
 feature_top9 <- feature_rank %>% 
-  select(feature, mean_rank, mean_overall) %>%
+  dplyr::select(feature, mean_rank, mean_overall) %>%
   arrange(desc(mean_overall)) %>% head(9) %>%
   pull(feature)
 #create the plot
-train_set_final %>%  
+train_set_final %>% 
+  #select the top9 features
+  dplyr::select(y, all_of(feature_top9)) %>%
+  # tidy the names
+  rename_at(vars(ends_with("25_64")), ~str_replace_all(., "_25_64", "")) %>%
   #pivot to a long version with a row per feature/value
   pivot_longer(cols = !"y", 
                names_to = "feature", 
                values_to = "value") %>%
-  filter(feature %in% feature_top9) %>% 
   ggplot(aes(y, value, col=feature))  + 
-  geom_point() +
+  geom_point(size=0.5) +
   facet_wrap(. ~feature,  scales = "free_y") +
   ggtitle("Outcome y for important features") +
   xlab("y, proportion of managerial & professional") +
@@ -2717,31 +2788,31 @@ train_set_final %>%
 
 #looking at correlation with y
 data.frame(cor(train_set_final)) %>%
-  select(y) %>%
+  dplyr::select(y) %>%
   rownames_to_column(var="feature") %>%
   filter(feature %in% feature_top9) %>% 
   arrange(desc(abs(y))) %>%
-  knitr::kable()
+  knitr::kable(caption="Correlation with the outcome y, for MSOA")
 
 # looking at the rmse with numbers of features
 #creating a function to choose the top n features, based on overall score
 topfeature_overall <- function(topn, traindata){
   feature_n <- feature_rank %>% 
-    select(feature, mean_rank, mean_overall) %>%
+    dplyr::select(feature, mean_rank, mean_overall) %>%
     arrange(desc(mean_overall)) %>% head(topn) %>%
     pull(feature)
   train_topn <- traindata %>%
-    select(y, all_of(feature_n))
+    dplyr::select(y, all_of(feature_n))
   return(train_topn)
 }
 #creating a function to choose the top n features, based on rank
 topfeature_rank <- function(topn, traindata){
   feature_n <- feature_rank %>% 
-    select(feature, mean_rank, mean_overall) %>%
+    dplyr::select(feature, mean_rank, mean_overall) %>%
     arrange(mean_rank) %>% head(topn) %>%
     pull(feature)
   train_topn <- traindata %>%
-    select(y, all_of(feature_n))
+    dplyr::select(y, all_of(feature_n))
   return(train_topn)
 }
 
@@ -2753,14 +2824,15 @@ train_top10_rank <- topfeature_rank(10, train_set_final)
 # names(train_top10_rank)
 train_top15 <- topfeature_overall(15, train_set_final)
 train_top20 <- topfeature_overall(20, train_set_final)
-train_top30 <- topfeature_overall(30, train_set_final)
 
 # tidy up
 save(feature_rank, file="rda/feature_rank.rda")
-save(train_top15, file="rda/train_top15.rda")
-save(train_top10, file="rda/train_top10.rda")
-rm(gbm_rank, glm_rank, glmboost_rank, glmboost_rank2, tmp, tmp2, feature_top9)
-rm(importance, importance_gbm, importance_glm, importance_glmboost)
+# save(train_top15, file="rda/train_top15.rda")
+# save(train_top10, file="rda/train_top10.rda")
+rm(gbm_rank, glm_rank, glmboost_rank, glmboost_rank2)
+rm(feature_top9)
+rm(importance_gbm, importance_glm, importance_glmboost)
+rm(topfeature_rank)
 
 # running on the GLM model
 # with the top15 training set
@@ -2796,6 +2868,11 @@ rmse_results %>%
   filter(str_detect(method, '"glm"') ) %>% 
   arrange(rmse) %>%
   knitr::kable()
+# tidy
+rm(train_top10, train_top10_rank)
+rm(train_top15, train_top20)
+rm(result_glm_train_top10, result_glm_train_top10_rank)
+rm(result_glm_train_top15, result_glm_train_top20)
 
 # running with features from top 10 to top 50 say
 #set up the RMSE table
@@ -2883,6 +2960,7 @@ rm(svm_top20_top40, svm_top20_top40_tmp)
 rm(svmradial_top20_top40, svmradial_top20_top40_tmp)
 rm(glm_top10_top50, glm_top10_top50_tmp)
 
+
 #### gam and gam loess again ####
 # running on GAM with 25 features
 train_top25 <- topfeature_overall(25, train_set_final)
@@ -2908,10 +2986,15 @@ result_gam_train_top28 <-
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_gam_train_top28$results, 1))
 rmse_results %>% knitr::kable()
+rmse_results %>% arrange(rmse) %>% knitr::kable()
+# checking the variable importance
+importance <- varImp(result_gam_train_top28$train, scale=TRUE)
+plot(importance, 20)
 # tidy
 save(result_gam_train_top28, file="rda/result_gam_train_top28.rda")
-load("rda/result_gam_train_top28.rda")
-rm(result_gam_train_top28)
+# load("rda/result_gam_train_top28.rda")
+# rm(result_gam_train_top28)
+save(rmse_results, file="rda/rmse_results.rda")
 
 # running on GAMloess with 28 features
 # with the train_top28 training set
@@ -2921,44 +3004,50 @@ result_gamloess_train_top28 <-
 rmse_results <- bind_rows(rmse_results, tail(result_gamloess_train_top28$results, 1))
 rmse_results %>% knitr::kable()
 # tidy
-save(result_gamLoess_train_top28, file="rda/result_gamLoess_train_top28.rda")
-rm(result_gamLoess_train_top28)
+save(result_gamloess_train_top28, file="rda/result_gamloess_train_top28.rda")
+rm(result_gamloess_train_top28)
 save(rmse_results, file="rda/rmse_results.rda")
+rm(importance)
+rm(train_top25)
 
 #checking the overall performance
 rmse_results %>% arrange(rmse) %>% head(10) %>%   knitr::kable() 
 
 # comparing gam and gamloess
-load("rda/result_gamLoess_train_top28.rda")
+load("rda/result_gamloess_train_top28.rda")
 load("rda/result_gam_train_top28.rda")
 y_hat_gam <- result_gam_train_top28$y_hat
-y_hat_gamLoess <- result_gamLoess_train_top28$y_hat
-data.frame(y_hat_gam, y_hat_gamLoess) %>%
-  ggplot(aes(y_hat_gam, y_hat_gamLoess)) + 
+y_hat_gamloess <- result_gamloess_train_top28$y_hat
+# graph of y hat against each other
+data.frame(y_hat_gam, y_hat_gamloess) %>%
+  ggplot(aes(y_hat_gam, y_hat_gamloess)) + 
   geom_point() +
   ggtitle("Comparing GAM vs GAM Loess predictions") +
   xlab("GAM model predictions") +
   ylab("GAM Loess model predictions")
-data.frame(y_hat_gam, y_hat_gamLoess) %>%
-  mutate(delta = (y_hat_gam-y_hat_gamLoess)) %>%
+# histogram of deltas
+data.frame(y_hat_gam, y_hat_gamloess) %>%
+  mutate(delta = (y_hat_gam-y_hat_gamloess)) %>%
   ggplot(aes(delta)) + 
   geom_histogram(bins = 30) +
   ggtitle("Comparing GAM vs GAM Loess predictions") +
   xlab("Delta between GAM and GAM Loess predictions") +
   ylab("number of predictions in each interval")
 # tidy
-rm(y_hat_gam, y_hat_gamLoess)
-rm(result_gamLoess_train_top28, result_gam_train_top28)
+rm(y_hat_gam, y_hat_gamloess)
+rm(result_gamloess_train_top28, result_gam_train_top28)
 
 # running on knn with 28 features, less age and area
 train_top28_knn <- train_top28 %>%
-  select(-age_median, -area_code)
+  dplyr::select(-age_median, -area_code)
 # with the train_top28 training set
 result_knn_train_top28_knn <- 
   results_train_method(train_top28_knn, test_set_final, "knn")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, tail(result_knn_train_top28_knn$results, 1))
 rmse_results %>% knitr::kable()
+# tidy
+rm(train_top28_knn, result_knn_train_top28_knn, train_top28)
 
 
 #### ensemble 3 ####
@@ -2974,24 +3063,22 @@ load("rda/result_glm_train_set_final.rda")
 load("rda/result_svm_train_set_final.rda")
 load("rda/result_svmradial_train_set_final.rda")
 load("rda/result_gam_train_top28.rda")
-load("rda/result_gamLoess_train_top28.rda")
+load("rda/result_gamloess_train_top28.rda")
 
 # an ensemble of the best five models
 y_hat_ens_table3 <- 
-  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
-  cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
+  data.frame(result_glm_train_set_final$y_hat) %>%
   cbind(data.frame(result_svm_train_set_final$y_hat)) %>%
   cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
   cbind(data.frame(result_gam_train_top28$y_hat)) %>%
-  cbind(data.frame(result_gamLoess_train_top28$y_hat)) %>%
-  select(-number) %>%
+  cbind(data.frame(result_gamloess_train_top28$y_hat)) %>%
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 head(y_hat_ens_table3)
 #test against the actual values
 rmse_ens <- rmse(test_set_final$y, y_hat_ens_table3$y_hat_ave)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="Ensemble3 glm, svm, svmRadial, gam, gamLoess", rmse = rmse_ens))
+                          tibble(method="Ensemble3 glm, svm, svmRadial, gam, gamloess", rmse = rmse_ens))
 rmse_results %>% 
   arrange(rmse) %>% head(20) %>% 
   knitr::kable(caption="Leading models including the ensembles, with MSOA")
@@ -2999,11 +3086,9 @@ rmse_results %>%
 #### ensemble 4 ####
 # an ensemble of the best three models
 y_hat_ens_table4 <- 
-  data.frame(number = 1:length(result_glm_train_set_final$y_hat)) %>%
-  cbind(data.frame(result_glm_train_set_final$y_hat)) %>%
+  data.frame(result_glm_train_set_final$y_hat) %>%
   cbind(data.frame(result_svmradial_train_set_final$y_hat)) %>%
   cbind(data.frame(result_gam_train_top28$y_hat)) %>%
-  select(-number) %>%
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 head(y_hat_ens_table4)
@@ -3033,19 +3118,21 @@ rmse_results %>%
 
 # tidy up
 save(y_hat_ens_table5, file="rda/y_hat_ens_table5.rda")
-# load("rda/y_hat_ens_table5.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(y_hat_ens_table3, rmse_ens, y_hat_ens_table4)
 rm(y_hat_ens_table5)
-rm(result_gamLoess_train_top28, result_svm_train_set_final)
-
+rm(result_gamloess_train_top28, result_svm_train_set_final)
+rm(result_gam_train_top28, result_glm_train_set_final)
+rm(result_svmradial_train_set_final)
+rm(feature_rank)
 
 #### Investigation and visualisation of errors ####
 # looking at the best ensemble model, and constituent ones svmRadial and gam
 # plot of y against y_hat for all three
+load("rda/y_hat_ens_table5.rda")
 y_hat_ens_table5 %>%
   cbind(y = test_set_final$y) %>%
-  rename(ensemble_y_hat=y_hat_ave) %>%
+  dplyr::rename(ensemble_y_hat=y_hat_ave) %>%
   pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
   ggplot(aes(x=y_hat, y=y, col=model)) +
   # geom_point() +  
@@ -3063,7 +3150,7 @@ y_hat_ens_table5 %>%
   mutate(svmradial_delta = (y-svmradial_y_hat)) %>%
   mutate(gam_delta = (y-gam_y_hat)) %>%
   mutate(ensemble_delta = (y-y_hat_ave)) %>%
-  select(-svmradial_y_hat, -gam_y_hat, -y_hat_ave) %>%
+  dplyr::select(-svmradial_y_hat, -gam_y_hat, -y_hat_ave) %>%
   pivot_longer(cols=contains("delta"), names_to="model", values_to="delta") %>%
   ggplot(aes(delta, fill=model)) +
   geom_histogram(bins = 30) +
@@ -3076,7 +3163,7 @@ y_hat_ens_table5 %>%
 # comparing the svmradial and gam models
 y_hat_ens_table5 %>%
   cbind(y = test_set_final$y) %>%
-  select(-y_hat_ave) %>%
+  dplyr::select(-y_hat_ave) %>%
   pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
   ggplot(aes(x=y_hat, y=y, col=model)) +
   geom_point()  +
@@ -3096,6 +3183,14 @@ largest_errors <- y_hat_ens_table5 %>%
 names(largest_errors)
 head(largest_errors, 20)
 
+# tidy
+rm(largest_errors)
+rm(y_hat_ens_table5)
+rm(train_small, train_small_cat)
+rm(train_smaller, train_smaller_cat)
+rm(train_final_nocat, train_set_final)
+rm(test_set_final)
+
 
 #### running on the validation / main set ####
 
@@ -3112,10 +3207,13 @@ names(validation_clean)
 head(main_clean)
 head(validation_clean)
 sum(is.na(main_clean))
+
 # tidy up
 save(main_clean, file="rda/main_clean.rda")
 save(validation_clean, file="rda/validation_clean.rda")
-rm(geo_lookup, tmp, tmp1)
+rm(geo_lookup)
+rm(main, validation)
+
 # create baseline
 mu_hat <- mean(main_clean$y)
 rmse_ave <- rmse(validation_clean$y, mu_hat)
@@ -3135,6 +3233,7 @@ rmse_results_validation <- bind_rows(rmse_results_validation,
 rmse_results_validation %>% knitr::kable()
 #tidy
 save(rmse_results_validation, file="rda/rmse_results_validation.rda")
+save(result_glm_main, file="rda/result_glm_main.rda")
 
 # run on svm radial
 # uses package kernlab
@@ -3149,7 +3248,7 @@ rmse_results_validation %>% knitr::kable()
 #tidy
 save(rmse_results_validation, file="rda/rmse_results_validation.rda")
 save(result_svmradial_main, file="rda/result_svmradial_main.rda")
-load("rda/rmse_results_validation.rda")
+# load("rda/rmse_results_validation.rda")
 
 # run on gam
 # load top 28 features with the GLM, GBM and GLM boost models on the train/test data
@@ -3176,7 +3275,7 @@ y_hat_ens_main <-
   #calculate average of the y_hats
   mutate(y_hat_ave = rowMeans(.))
 #test against the actual values
-rmse_ens <- rmse(validation$y, y_hat_ens_main$y_hat_ave)
+rmse_ens <- rmse(validation_clean$y, y_hat_ens_main$y_hat_ave)
 rmse_results_validation <- bind_rows(rmse_results_validation,
                           tibble(method="Ensemble svmRadial, gam28",  
                                  rmse = rmse_ens))
@@ -3185,26 +3284,28 @@ rmse_results_validation %>% knitr::kable()
 # comparing the svmradial and gam models
 y_hat_ens_main %>%
   cbind(y = validation$y) %>%
-  select(-y_hat_ave) %>%
+  dplyr::select(-y_hat_ave) %>%
   pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
   ggplot(aes(x=y_hat, y=y, col=model)) +
   geom_point()  +
   geom_abline(slope = 1, intercept = 0, col="black") +
-  ggtitle("Comparing gam and svm radial predictions vs the outcome y") +
+  ggtitle("Comparing gam & svm radial predictions vs the outcome y for main") +
   xlab("model predictions") +
   ylab("actual values, y") 
 
-# tidy up
+# tidy up, remove all data sets relating to MSOA
 save(rmse_results_validation, file="rda/rmse_results_validation.rda")
 save(y_hat_ens_main, file="rda/y_hat_ens_main.rda")
-load("rda/y_hat_ens_main.rda")
+# load("rda/y_hat_ens_main.rda")
 rm(rmse_ens, y_hat_ens_main)
+rm(mu_hat, rmse_ave)
 rm(result_gam_main_top28)
 rm(result_svmradial_main)
 rm(result_glm_main)
-rm(train_set_final, train_smaller, test_set_final)
-rm(validation, validation_clean, main, main_clean, main_top28)
+rm(validation_clean, main_clean, main_top28)
 rm(rmse_results, rmse_results_validation)
+rm(feature_rank)
+rm(geographytype)
 
 
 #### running on the SOA  #####
@@ -3224,8 +3325,8 @@ data_set <- import_data("2013265927TYPE299")
 load("rda/data_set_2013265927TYPE299.rda")
 # tidy up
 data_set_london <- data_set
-rm(filename)
-rm(geographytype)
+rm(data_set)
+# rm(geographytype)
 
 # Yorkshire and The Humber
 # <option value="2013265923TYPE299">output areas 2011 in Yorkshire and The Humber
@@ -3237,9 +3338,12 @@ data_set <- import_data("2013265923TYPE299")
 load("rda/data_set_2013265923TYPE299.rda")
 # tidy up
 data_set_yorkshire <- data_set
-rm(ingest, marital_predictors, country_predictors, occupation_target)
+rm(marital_predictors, country_predictors, occupation_target)
 rm(ethnicity_predictors, household_predictors, religion_predictors)
-rm(industry_predictors, sex_predictors, qualifications_predictors, age_predictors)
+rm(industry_predictors, sex_predictors)
+rm(qualifications_predictors, age_predictors)
+rm(import_data)
+rm(censusdata_list)
 
 
 #combine in to one data set
@@ -3247,6 +3351,8 @@ data_set <- data_set_london %>%
   rbind(data_set_yorkshire)
 # tidy
 save(data_set, file="rda/data_set_lon_york.rda")
+rm(data_set_london, data_set_yorkshire)
+
 
 #### create main and validation set
 # Validation set will be 10% of the data
@@ -3261,7 +3367,6 @@ rm(validation_soa, data_set, test_index)
 
 #### create test and train set
 load("rda/main_soa.rda")
-# load("rda/main_tidy.rda")
 # test set will be 10% of the data
 set.seed(2001, sample.kind="Rounding")
 test_index <- createDataPartition(y = main_soa$y, times = 1, p = 0.1, list = FALSE)
@@ -3273,9 +3378,9 @@ sum(is.na(train_soa))
 ### tidy, take backup:
 save(train_soa, file='rda/train_soa.rda')
 save(test_soa, file='rda/test_soa.rda')
-rm(main_soa, main_tidy_soa, main_new_soa, test_index)
-load("rda/test_soa.rda")
-load("rda/train_soa.rda")
+rm(main_soa, test_index)
+# load("rda/test_soa.rda")
+# load("rda/train_soa.rda")
 
 #data cleanse on the test set and train set
 load("rda/geo_lookup.rda")
@@ -3300,7 +3405,7 @@ sum(is.na(test_soa_final))
 # tidy up
 save(test_soa_final, file="rda/test_soa_final.rda")
 save(train_soa_final, file="rda/train_soa_final.rda")
-rm(test_soa, train_soa, geo_mapping, geo_lookup, main_soa)
+rm(test_soa, train_soa, geo_lookup)
 
 #### baseline rmse and rmse function
 # load the test and train data
@@ -3314,6 +3419,7 @@ rmse_results_soa <- tibble(method = "Mean of all locations", rmse = rmse_ave)
 rmse_results_soa %>% knitr::kable()
 # tidy
 save(rmse_results_soa, file="rda/rmse_results_soa.rda")
+rm(mu_hat, rmse_ave)
 # load("rda/rmse_results_soa.rda")
 load("rda/rmse_results.rda")
 rmse_results %>% knitr::kable()
@@ -3346,6 +3452,7 @@ data.frame("Residents_in_SOA" = main_soa_sizes) %>%
 rm(main, main_soa, main_soa_sizes, main_sizes)
 
 #graph the outcome y
+load("rda/train_set_final.rda")
 tmp <- data.frame(SOA=train_soa_final$y) %>%
   pivot_longer(cols = SOA,
                names_to = "area_type", 
@@ -3378,15 +3485,15 @@ data.frame("y_SOA" = train_soa_y) %>%
   cbind(data.frame("y_MSOA" = train_msoa_y)) %>%
   knitr::kable(caption="Comparison of y, proportion of senior managers and professional occupations in SOA and MSOA")
 # tidy
-rm(tmp, train_soa_y, train_soa_y)
+rm(tmp, train_soa_y, train_soa_y, train_msoa_y)
 
 # graph illustrating the impact of London or Yorkshire
 test_soa_final %>%
-  select(y, london, yorkshire_humber) %>%
+  dplyr::select(y, london, yorkshire_humber) %>%
   pivot_longer(cols=c("london", "yorkshire_humber"), 
                names_to="region", values_to="true") %>%
   filter(true=="1") %>%
-  select(-true) %>%  
+  dplyr::select(-true) %>%  
   ggplot(aes(y, fill=region))  + 
   geom_histogram(bins = 30) +
   ggtitle("Distribution of the outcome, y for regions") +
@@ -3394,15 +3501,6 @@ test_soa_final %>%
   ylab("count of numbers of SOA areas")
 
 #looking at the features
-
-main_tidy <- main %>%  
-  select(-occupation_all, -all_residents, -geo_type, -geo_name, -age_median) %>%
-  #tidy the names, removing the _25_64
-  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
-  #pivot to a long version with a row per feature/value
-  pivot_longer(cols = c(-geo_code, -y),
-               names_to = "feature", 
-               values_to = "proportion")
 # box plot of features expressed as a ratio
 # identify the geography features not necessary for this graph
 load("rda/geo_lookup.rda")
@@ -3413,7 +3511,7 @@ geography_features <-  intersect(
 # plot the graph
 train_soa_final %>%  
   # remove columns not needed, features that are not ratios
-  select(-age_median, -area_code, -all_of(geography_features)) %>%
+  dplyr::select(-age_median, -area_code, -all_of(geography_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   #pivot to a long version with a row per feature/value
@@ -3426,6 +3524,10 @@ train_soa_final %>%
   ylab("proportion") + 
   xlab("feature name, reordered by mean") + 
   theme(axis.text.x=element_text(angle = 90, hjust=1, vjust=0.5))
+# tidy
+rm(geo_lookup)
+rm(geography_features)
+
 
 #### modelling on the train/test data
 # GLM
@@ -3496,16 +3598,16 @@ rm(result_glmboost_train_soa)
 
 # top 28 features
 # using GLM, GBM, GLM boost to rank features
-load("rda/importance_soa_gbm.rda")
-load("rda/importance_soa_glm.rda")
-load("rda/importance_soa_glmboost.rda")
+# load("rda/importance_soa_gbm.rda")
+# load("rda/importance_soa_glm.rda")
+# load("rda/importance_soa_glmboost.rda")
 #create ranking for gbm algorithm, with normalised score
 gbm_soa_rank <- importance_soa_gbm$importance %>%
   rownames_to_column(var = "feature") %>%
   arrange(desc(Overall)) %>% 
   cbind(data.frame(gbm_rank = 1:length(importance_soa_gbm$importance$Overall))) %>%
   mutate("gbm_overall" = Overall/max(Overall)) %>% 
-  select(-Overall)
+  dplyr::select(-Overall)
 head(gbm_soa_rank)
 #create ranking for glm algorithm, with normalised score
 glm_soa_rank <- importance_soa_glm$importance %>%
@@ -3513,7 +3615,7 @@ glm_soa_rank <- importance_soa_glm$importance %>%
   arrange(desc(Overall)) %>% 
   cbind(data.frame(glm_rank = 1:length(importance_soa_glm$importance$Overall))) %>%
   mutate("glm_overall" = Overall/max(Overall)) %>% 
-  select(-Overall)
+  dplyr::select(-Overall)
 head(glm_soa_rank)
 #create ranking for glmboost algorithm, with normalised score
 glmboost_soa_rank <- importance_soa_glmboost$importance %>%
@@ -3521,7 +3623,7 @@ glmboost_soa_rank <- importance_soa_glmboost$importance %>%
   arrange(desc(Overall)) %>% 
   cbind(data.frame(glmboost_rank = 1:length(importance_soa_glmboost$importance$Overall))) %>%
   mutate("glmboost_overall" = Overall/max(Overall)) %>% 
-  select(-Overall)
+  dplyr::select(-Overall)
 head(glmboost_soa_rank)
 # combined ranking table, with mean, and reordered
 feature_rank <- glm_soa_rank %>%
@@ -3538,8 +3640,11 @@ train_soa_top28 <- topfeature_overall(28, train_soa_final)
 
 # tidy up
 save(feature_rank, file="rda/feature_rank_soa.rda")
-save(train_soa_top28, file="rda/train_soa_top28")
+save(train_soa_top28, file="rda/train_soa_top28.rda")
 # load("rda/train_soa_top28")
+rm(importance_soa_gbm, importance_soa_glm, importance_soa_glmboost)
+rm(glm_soa_rank, gbm_soa_rank, glmboost_soa_rank)
+
 
 #### SVM radial
 # uses package kernlab
@@ -3553,65 +3658,64 @@ rmse_results_soa <- bind_rows(rmse_results_soa,
 rmse_results_soa %>% knitr::kable()
 # poor performance, lots of errors
 # with the top28 train set
-result_svmradial_train_soa_top28 <- 
-  results_train_method(train_soa_top28, test_soa_final, "svmRadial")
+# result_svmradial_train_soa_top28 <- 
+#   results_train_method(train_soa_top28, test_soa_final, "svmRadial")
 # failed
 # training with 15 features
 # load("rda/feature_rank_soa.rda")
-#create new training set, using the function from earlier
-train_soa_top5 <- topfeature_overall(5, train_soa_final)
-train_soa_top10 <- topfeature_overall(10, train_soa_final)
-train_soa_top15 <- topfeature_overall(15, train_soa_final)
-# with the top15 train set
-result_svmradial_train_soa_top15 <- 
-  results_train_method(train_soa_top15, test_soa_final, "svmRadial")
-# with the top5 train set
-result_svmradial_train_soa_top5 <- 
-  results_train_method(train_soa_top5, test_soa_final, "svmRadial")
+
+#create new small and smaller training sets
+
 #sampling the 5000 observations
 set.seed(2001, sample.kind="Rounding")
 index <- sample(1:nrow(train_soa_final), 5000, replace = FALSE)
 train_soa_5k <- train_soa_final[index,]
 #create new training set, using the function from earlier
 train_soa_5k_top5 <- topfeature_overall(5, train_soa_5k)
+train_soa_5k_top10 <- topfeature_overall(10, train_soa_5k)
+train_soa_5k_top15 <- topfeature_overall(15, train_soa_5k)
+train_soa_5k_top28 <- topfeature_overall(28, train_soa_5k)
+
 # with the 5k top5 train set
 result_svmradial_train_soa_5k_top5 <- 
   results_train_method(train_soa_5k_top5, test_soa_final, "svmRadial")
 # extract the rmse from the results
 rmse_results_soa <- bind_rows(rmse_results_soa,
                               tail(result_svmradial_train_soa_5k_top5$results, 1))
+rmse_results_soa %>% knitr::kable()
 # with the 5k top10 train set
-train_soa_5k_top10 <- topfeature_overall(10, train_soa_5k)
-# training the model
 result_svmradial_train_soa_5k_top10 <- 
   results_train_method(train_soa_5k_top10, test_soa_final, "svmRadial")
 # extract the rmse from the results
 rmse_results_soa <- bind_rows(rmse_results_soa,
                               tail(result_svmradial_train_soa_5k_top10$results, 1))
+rmse_results_soa %>% knitr::kable()
 # with the 5k top15 train set
-train_soa_5k_top15 <- topfeature_overall(15, train_soa_5k)
-# training the model
 result_svmradial_train_soa_5k_top15 <- 
   results_train_method(train_soa_5k_top15, test_soa_final, "svmRadial")
 # extract the rmse from the results
 rmse_results_soa <- bind_rows(rmse_results_soa,
                               tail(result_svmradial_train_soa_5k_top15$results, 1))
+rmse_results_soa %>% knitr::kable()
 # with the 5k top28 train set
-train_soa_5k_top28 <- topfeature_overall(28, train_soa_5k)
-# training the model
 result_svmradial_train_soa_5k_top28 <- 
   results_train_method(train_soa_5k_top28, test_soa_final, "svmRadial")
 # extract the rmse from the results
 rmse_results_soa <- bind_rows(rmse_results_soa,
                               tail(result_svmradial_train_soa_5k_top28$results, 1))
 rmse_results_soa %>% knitr::kable()
+
 #tidy 
-save(result_svmradial_train_soa_5k_top28, 
+save(result_svmradial_train_soa, file="rda/result_svmradial_train_soa.rda")
+save(result_svmradial_train_soa_5k_top28,
      file="result_svmradial_train_soa_5k_top28.rda")
 save(rmse_results_soa, file="rda/rmse_results_soa.rda")
 rm(result_svmradial_train_soa_5k_top28, result_svmradial_train_soa_5k_top15)
 rm(result_svmradial_train_soa_5k_top10, result_svmradial_train_soa_5k_top5)
-# load("rda/rmse_results_soa.rda")
+rm(result_svmradial_train_soa)
+rm(index)
+rm(train_soa_5k)
+
 #sampling the 10000 observations
 set.seed(2001, sample.kind="Rounding")
 index <- sample(1:nrow(train_soa_final), 10000, replace = FALSE)
@@ -3629,8 +3733,10 @@ rmse_results_soa %>% knitr::kable()
 
 # tidy
 save(rmse_results_soa, file="rda/rmse_results_soa.rda")
-save(result_svmradial_train_soa_10k_top28, file="rda/result_svmradial_train_soa_10k_top28.rda")
+save(result_svmradial_train_soa_10k_top28, 
+     file="rda/result_svmradial_train_soa_10k_top28.rda")
 rm(result_svmradial_train_soa_10k_top28, index)
+rm(train_soa_10k)
 
 #sampling the 15000 observations
 set.seed(2001, sample.kind="Rounding")
@@ -3652,18 +3758,20 @@ save(result_svmradial_train_soa_15k_top28,
      file="rda/result_svmradial_train_soa_15k_top28.rda")
 rm(result_svmradial_train_soa_15k_top28)
 rm(index)
+rm(train_soa_15k)
 
 
 #### GAM 28
 # this uses the mgcv and nlme packages
-if (!require('mgcv')) install.packages('mgcv'); library('mgcv')
 if (!require('nlme')) install.packages('nlme'); library('nlme')
+if (!require('mgcv')) install.packages('mgcv'); library('mgcv')
 # with the soa top 28 training set
 result_gam_train_soa_top28 <- 
   results_train_method(train_soa_top28, test_soa_final, "gam")
 # extract the rmse from the results
 rmse_results_soa <- bind_rows(rmse_results_soa, 
-                              tail(result_gam_train_soa_small_top28$results, 1))
+                              tail(result_gam_train_soa_top28$results, 1))
+rmse_results_soa %>% knitr::kable()
 # with the 5k top28 SOA training set
 result_gam_train_soa_5k_top28 <- 
   results_train_method(train_soa_5k_top28, test_soa_final, "gam")
@@ -3678,6 +3786,8 @@ plot(importance, 20)
 save(rmse_results_soa, file="rda/rmse_results_soa.rda")
 save(result_gam_train_soa_top28, file="rda/result_gam_train_soa_top28.rda")
 rm(result_gam_train_soa_top28)
+rm(result_gam_train_soa_5k_top28)
+rm(importance)
 
 # with the 10k top28 SOA training set
 result_gam_train_soa_10k_top28 <- 
@@ -3707,7 +3817,11 @@ save(result_gam_train_soa_15k_top28,
 rm(result_gam_train_soa_15k_top28)
 rmse_results_soa %>% 
   arrange(rmse) %>% knitr::kable()
-
+rm(train_soa_top28)
+rm(train_soa_10k_top28, train_soa_15k_top28)
+rm(train_soa_5k_top10, train_soa_5k_top15)
+rm(train_soa_5k_top28, train_soa_5k_top5)
+rm(feature_rank)
 
 ### ensemble with SOA data
 #ensemble of SVM Radial and GBM
@@ -3726,20 +3840,19 @@ rmse_results_soa <- bind_rows(rmse_results_soa,
 rmse_results_soa %>%
   # arrange(rmse) %>% head(10) %>% knitr::kable()
   arrange(rmse) %>% knitr::kable()
-
 # tidy up
 save(y_hat_ens_table6, file="rda/y_hat_ens_table6.rda")
 save(rmse_results_soa, file="rda/rmse_results_soa.rda")
 rm(rmse_ens)
-rm(y_hat_ens_table6)
 rm(result_svmradial_train_soa_15k_top28, result_gbm_train_soa)
 
 ## visualisation of errors
 # looking at the best ensemble model, and constituent ones svmRadial and gbm
+load("rda/y_hat_ens_table6.rda")
 # plot of y against y_hat for all three
 y_hat_ens_table6 %>%
   cbind(y = test_soa_final$y) %>%
-  rename(ensemble_y_hat=y_hat_ave) %>%
+  dplyr::rename(ensemble_y_hat=y_hat_ave) %>%
   pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
   ggplot(aes(x=y_hat, y=y, col=model)) +
   geom_point() +  
@@ -3756,7 +3869,7 @@ y_hat_ens_table6 %>%
   mutate(svmradial_delta = (y-svmradial_y_hat)) %>%
   mutate(gbm_delta = (y-gbm_y_hat)) %>%
   mutate(ensemble_delta = (y-y_hat_ave)) %>%
-  select(-svmradial_y_hat, -gbm_y_hat, -y_hat_ave) %>%
+  dplyr::select(-svmradial_y_hat, -gbm_y_hat, -y_hat_ave) %>%
   pivot_longer(cols=contains("delta"), names_to="model", values_to="delta") %>%
   ggplot(aes(delta, fill=model)) +
   geom_histogram(bins = 30) +
@@ -3769,7 +3882,7 @@ y_hat_ens_table6 %>%
 # comparing the svmradial and gam models
 y_hat_ens_table6 %>%
   cbind(y = test_soa_final$y) %>%
-  select(-y_hat_ave) %>%
+  dplyr::select(-y_hat_ave) %>%
   pivot_longer(cols=contains("y_hat"), names_to="model", values_to="y_hat") %>%
   ggplot(aes(x=y_hat, y=y, col=model)) +
   geom_point()  +
@@ -3777,54 +3890,56 @@ y_hat_ens_table6 %>%
   ggtitle("Comparing gbm and svm radial predictions vs the outcome y") +
   xlab("model predictions") +
   ylab("actual values, y") 
-
 # tidy
-rm(result_gam_train_soa_10k_top28)
-rm(result_gbm_train_soa)
-rm(result_svmradial_train_soa_15k_top28)
-rm(tmp)
+rm(y_hat_ens_table6)
+
 
 #### feature importance ####
-
-# plotting the top 9 for SOA
+# plotting the top 9 for SOA (9 as it fits 3 by 3 in the plot)
 load("rda/feature_rank_soa.rda")
 feature_rank_soa <- feature_rank
+rm(feature_rank)
 feature_top9_soa <- feature_rank_soa %>% 
-  select(feature, mean_rank, mean_overall) %>%
+  dplyr::select(feature, mean_rank, mean_overall) %>%
   arrange(desc(mean_overall)) %>% head(9) %>%
   pull(feature)
 # feature_top9_soa
 # feature_rank_soa
 #create the plot
 train_soa_final %>%  
+  # select only the top 9 features
+  dplyr::select(y, all_of(feature_top9_soa)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   #pivot to a long version with a row per feature/value
   pivot_longer(cols = !"y", 
                names_to = "feature", 
                values_to = "value") %>%
-  filter(feature %in% feature_top9_soa) %>% 
   ggplot(aes(y, value, col=feature))  + 
   geom_point(size=0.5) +
+  # put in to separate graphs
   facet_wrap(. ~feature,  scales = "free_y") +
   ggtitle("Outcome y for important features for SOA areas") +
   xlab("y, proportion of managerial & professional") +
   ylab("feature values")
-
 #looking at correlation with y
 data.frame(cor(train_soa_final)) %>%
-  select(y) %>%
+  dplyr::select(y) %>%
   rownames_to_column(var="feature") %>%
   filter(feature %in% feature_top9_soa) %>% 
   arrange(desc(abs(y))) %>%
   knitr::kable()
-
 # tidy
-rm(feature_rank, feature_rank_soa)
+rm(feature_rank_soa, feature_top9_soa)
 
 ## qualification and level 4 deep dive
 # qualification features SOA
 load('rda/qualifications.rda')
 qualifications_features <- names(qualifications) %>% str_subset("25_64")
-train_soa_final %>%  select(y, all_of(qualifications_features)) %>%
+train_soa_final %>%  
+  dplyr::select(y, all_of(qualifications_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
   pivot_longer(cols = -y,
                names_to = "feature", 
@@ -3837,7 +3952,10 @@ train_soa_final %>%  select(y, all_of(qualifications_features)) %>%
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of qualification type")
 # qualification features MSOA
-train_set_final %>%  select(y, all_of(qualifications_features)) %>%
+train_set_final %>%  
+  dplyr::select(y, all_of(qualifications_features)) %>%
+  #tidy the names, removing the _25_64
+  rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
   pivot_longer(cols = -y,
                names_to = "feature", 
@@ -3850,18 +3968,18 @@ train_set_final %>%  select(y, all_of(qualifications_features)) %>%
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of qualification type")
 
-#Plot of y vs level 4 with colour as proportion of white uk
+# Plot of y vs level 4 with colour as proportion of white uk
 # initial prep of the SOA data, retaining only the relevant columns
 train_soa_final_excerpt <- train_soa_final %>%  
-  select(y, level4_25_64, white_uk_25_64) %>%
-  rename(SOA = y) %>%
+  dplyr::select(y, level4_25_64, white_uk_25_64) %>%
+  dplyr::rename(SOA = y) %>%
   # pivot longer with the lavel soa
   pivot_longer(cols = SOA,
                names_to = "area_type", 
                values_to = "y")
 train_set_final %>%
-  select(y, level4_25_64, white_uk_25_64) %>%
-  rename(MSOA = y) %>%
+  dplyr::select(y, level4_25_64, white_uk_25_64) %>%
+  dplyr::rename(MSOA = y) %>%
   # pivot longer with the label MSOA
   pivot_longer(cols = MSOA,
                names_to = "area_type", 
@@ -3875,10 +3993,9 @@ train_set_final %>%
   ggtitle("Outcome y for level4 features") +
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of level4 qualifications")
-
 # looking at stratification for the white uk, soa
 train_soa_final %>%  
-  select(y, level4_25_64, white_uk_25_64) %>%
+  dplyr::select(y, level4_25_64, white_uk_25_64) %>%
   # round to nearest 0.1
   mutate(white_uk_strata = round(white_uk_25_64, 1)) %>%
   ggplot(aes(y, level4_25_64, col=white_uk_25_64))  + 
@@ -3888,20 +4005,22 @@ train_soa_final %>%
   ggtitle("Outcome y for level4 features, stratified by 'white UK' in SOA") +
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of level4 qualifications")
-
 # stratification and correlation
 train_soa_final %>%  
-  select(y, level4_25_64, white_uk_25_64) %>%
+  dplyr::select(y, level4_25_64, white_uk_25_64) %>%
   # round to nearest 0.1
   mutate(white_uk_strata = round(white_uk_25_64, 1)) %>%
   group_by(white_uk_strata) %>%
   dplyr::summarize(correlation = cor(y, level4_25_64)) %>%
   knitr::kable()
+# tidy
+rm(qualifications)
+rm(train_soa_final_excerpt)
 
 #industry features SOA
 load('rda/industry.rda')
 industry_features <- names(industry) %>% str_subset("25_64")
-train_soa_final %>%  select(y, all_of(industry_features)) %>%
+train_soa_final %>% dplyr::select(y, all_of(industry_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
@@ -3916,7 +4035,7 @@ train_soa_final %>%  select(y, all_of(industry_features)) %>%
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of industry type")
 #industry features MSOA
-train_set_final %>%  select(y, all_of(industry_features)) %>%
+train_set_final %>%  dplyr::select(y, all_of(industry_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
@@ -3930,11 +4049,13 @@ train_set_final %>%  select(y, all_of(industry_features)) %>%
   ggtitle("Outcome y for industry features in MSOA") +
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of industry type")
+# tidy
+rm(industry, industry_features)
 
 # household features soa
 load('rda/household.rda')
 household_features <- names(household) %>% str_subset("25_64")
-train_soa_final %>%  select(y, all_of(household_features)) %>%
+train_soa_final %>%  dplyr::select(y, all_of(household_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
@@ -3949,8 +4070,8 @@ train_soa_final %>%  select(y, all_of(household_features)) %>%
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of household type")
 # household features msoa
-load("rda/train_set_final.rda")
-train_set_final %>%  select(y, all_of(household_features)) %>%
+# load("rda/train_set_final.rda")
+train_set_final %>%  dplyr::select(y, all_of(household_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
@@ -3964,11 +4085,13 @@ train_set_final %>%  select(y, all_of(household_features)) %>%
   ggtitle("Outcome y for household features in MSOA") +
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of household type")
+# tidy
+rm(household, household_features)
 
 #marital features soa
 load('rda/marital.rda')
 marital_features <- names(marital) %>% str_subset("25_64")
-train_soa_final %>%  select(y, all_of(marital_features)) %>%
+train_soa_final %>%  dplyr::select(y, all_of(marital_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
@@ -3983,8 +4106,8 @@ train_soa_final %>%  select(y, all_of(marital_features)) %>%
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of marital type")
 #marital features msoa
-load("rda/train_set_final.rda")
-train_set_final %>%  select(y, all_of(marital_features)) %>%
+# load("rda/train_set_final.rda")
+train_set_final %>%  dplyr::select(y, all_of(marital_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
@@ -3999,19 +4122,19 @@ train_set_final %>%  select(y, all_of(marital_features)) %>%
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of marital type")
 # tidy up
-rm(marital, industry, household)
-rm(marital_features, industry_features, household_features)
+rm(marital, marital_features)
 
 
 #### running without the qualification features ####
 ## msoa data
 # removing the qualification data
 # get the names of the features
-load('rda/qualifications.rda')
+# load('rda/qualifications.rda')
 load("rda/test_set_final.rda")
-load("rda/rmse_results.rda")
-qualifications_features <- names(qualifications) %>% str_subset("25_64")
-train_msoa_noqual <- train_set_final %>% select(-all_of(qualifications_features))
+# load("rda/rmse_results.rda")
+# qualifications_features <- names(qualifications) %>% str_subset("25_64")
+train_msoa_noqual <- train_set_final %>% 
+  dplyr::select(-all_of(qualifications_features))
 # train with the no qualification data set
 result_glm_train_msoa_noqual <- 
   results_train_method(train_msoa_noqual, test_set_final, "glm")
@@ -4023,22 +4146,21 @@ rmse_results %>% knitr::kable()
 importance <- varImp(result_glm_train_msoa_noqual$train, scale=FALSE)
 plot(importance, 20)
 importance$importance
-
 # tidy up
 save(result_glm_train_msoa_noqual, file="rda/result_glm_train_msoa_noqual.rda")
-load("rda/result_glm_train_msoa_noqual.rda")
+# load("rda/result_glm_train_msoa_noqual.rda")
 save(rmse_results, file="rda/rmse_results.rda")
 rm(qualifications, qualifications_features)
 rm(train_msoa_noqual, result_glm_train_msoa_noqual)
+rm(importance)
 
 #### ethnicity deep dive ####
-
 #ethnicity features vs y soa
 load('rda/ethnicity.rda')
 ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
 train_soa_final %>% 
   #select only the ethnicity features
-  select(y, all_of(ethnicity_features)) %>%
+  dplyr::select(y, all_of(ethnicity_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # rename(str_replace_all(., "_25_64", "")) %>%
@@ -4055,10 +4177,10 @@ train_soa_final %>%
   xlab("y, proportion of managerial & professional") +
   ylab("proportion of ethnicity type")
 #ethnicity features msoa
-load("rda/train_set_final.rda")
+# load("rda/train_set_final.rda")
 train_set_final %>%  
   #select only the ethnicity features
-  select(y, all_of(ethnicity_features)) %>%
+  dplyr::select(y, all_of(ethnicity_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
@@ -4083,25 +4205,24 @@ train_soa_rcorr <- rcorr(as.matrix(train_soa_final))
 train_soa_ethnicity_p <- 
   data.frame(train_soa_rcorr$P) %>%
   # select the y column
-  select(y) %>%
+  dplyr::select(y) %>%
   rownames_to_column(var="feature") %>%
   # choose only the ethnicity features
   filter(feature %in% ethnicity_features) %>%
-  rename("p_value" = "y")
+  dplyr::rename("p_value" = "y")
 # extract correlation, and display with p-value result
 data.frame(train_soa_rcorr$r) %>%
   # select the y column
-  select(y) %>%
+  dplyr::select(y) %>%
   rownames_to_column(var="feature") %>%
   # choose only the ethnicity features
   filter(feature %in% ethnicity_features) %>%
-  rename("y_correlation_coefficient" = "y") %>%
+  dplyr::rename("y_correlation_coefficient" = "y") %>%
   #include the p_value
   left_join(train_soa_ethnicity_p) %>%
   # reorder and display
   arrange(desc(abs(y_correlation_coefficient))) %>%
   knitr::kable(caption = "Correlation and P results for ethnicity and y in SOA") 
-
 
 # extract the ethnicity features for MSOA
 # calculate the correlation matrix and p valuer matrix
@@ -4110,30 +4231,30 @@ train_msoa_rcorr <- rcorr(as.matrix(train_set_final))
 train_msoa_ethnicity_p <- 
   data.frame(train_msoa_rcorr$P) %>%
   # select the y column
-  select(y) %>%
+  dplyr::select(y) %>%
   rownames_to_column(var="feature") %>%
   # choose only the ethnicity features
   filter(feature %in% ethnicity_features) %>%
-  rename("p_value" = "y")
+  dplyr::rename("p_value" = "y")
 # extract correlation, and display with p-value result
 data.frame(train_msoa_rcorr$r) %>%
   # select the y column
-  select(y) %>%
+  dplyr::select(y) %>%
   rownames_to_column(var="feature") %>%
   # choose only the ethnicity features
   filter(feature %in% ethnicity_features) %>%
-  rename("y_correlation_coefficient" = "y") %>%
+  dplyr::rename("y_correlation_coefficient" = "y") %>%
   #include the p_value
   left_join(train_msoa_ethnicity_p) %>%
   # reorder and display
   arrange(desc(abs(y_correlation_coefficient))) %>%
   knitr::kable(caption = "Correlation and P results for ethnicity and y in MSOA") 
 #ethnicity features vs level4 soa
-load('rda/ethnicity.rda')
-ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
+# load('rda/ethnicity.rda')
+# ethnicity_features <- names(ethnicity) %>% str_subset("25_64")
 train_soa_final %>% 
   #select only the ethnicity features
-  select(level4_25_64, all_of(ethnicity_features)) %>%
+  dplyr::select(level4_25_64, all_of(ethnicity_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # rename(str_replace_all(., "_25_64", "")) %>%
@@ -4150,10 +4271,10 @@ train_soa_final %>%
   xlab("level4, proportion of degree or equivalent") +
   ylab("proportion of ethnicity type")
 #ethnicity features msoa
-load("rda/train_set_final.rda")
+# load("rda/train_set_final.rda")
 train_set_final %>%  
   #select only the ethnicity features
-  select(level4_25_64, all_of(ethnicity_features)) %>%
+  dplyr::select(level4_25_64, all_of(ethnicity_features)) %>%
   #tidy the names, removing the _25_64
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   # pivot longer with the features
@@ -4173,19 +4294,19 @@ train_set_final %>%
 train_soa_level4_p <- 
   data.frame(train_soa_rcorr$P) %>%
   # select the level4 columns
-  select(level4_25_64) %>%
+  dplyr::select(level4_25_64) %>%
   rownames_to_column(var="feature") %>%
   # choose only the ethnicity features
   filter(feature %in% ethnicity_features) %>%
-  rename("p_value" = "level4_25_64")
+  dplyr::rename("p_value" = "level4_25_64")
 # extract correlation, and display with p-value result
 data.frame(train_soa_rcorr$r) %>%
   # select the level4 columns
-  select(level4_25_64) %>%
+  dplyr::select(level4_25_64) %>%
   rownames_to_column(var="feature") %>%
   # choose only the ethnicity features
   filter(feature %in% ethnicity_features) %>%
-  rename("level4_correlation_coefficient" = "level4_25_64") %>%
+  dplyr::rename("level4_correlation_coefficient" = "level4_25_64") %>%
   #include the p_value
   left_join(train_soa_level4_p) %>%
   # reorder and display
@@ -4197,19 +4318,19 @@ data.frame(train_soa_rcorr$r) %>%
 train_msoa_level4_p <- 
   data.frame(train_msoa_rcorr$P) %>%
   # select the level4 columns
-  select(level4_25_64) %>%
+  dplyr::select(level4_25_64) %>%
   rownames_to_column(var="feature") %>%
   # choose only the ethnicity features
   filter(feature %in% ethnicity_features) %>%
-  rename("p_value" = "level4_25_64")
+  dplyr::rename("p_value" = "level4_25_64")
 # extract correlation, and display with p-value result
 data.frame(train_msoa_rcorr$r) %>%
   # select the level4 columns
-  select(level4_25_64) %>%
+  dplyr::select(level4_25_64) %>%
   rownames_to_column(var="feature") %>%
   # choose only the ethnicity features
   filter(feature %in% ethnicity_features) %>%
-  rename("level4_correlation_coefficient" = "level4_25_64") %>%
+  dplyr::rename("level4_correlation_coefficient" = "level4_25_64") %>%
   #include the p_value
   left_join(train_msoa_level4_p) %>%
   # reorder and display
@@ -4219,7 +4340,7 @@ data.frame(train_msoa_rcorr$r) %>%
 # looking at stratification for the black african, soa
 train_soa_final %>%
   # select columns
-  select(y, level4_25_64, black_african_25_64) %>%
+  dplyr::select(y, level4_25_64, black_african_25_64) %>%
   # round to nearest 0.5
   mutate(black_african_strata = (round(2*black_african_25_64, 1))/2) %>%
   # filter to those strata with more than 50 samples
@@ -4235,7 +4356,7 @@ train_soa_final %>%
 # looking at stratification for the black other, soa
 train_soa_final %>%
   # select columns
-  select(y, level4_25_64, black_other_25_64) %>%
+  dplyr::select(y, level4_25_64, black_other_25_64) %>%
   # round to nearest 0.5
   mutate(black_other_strata = (round(2*black_other_25_64, 1))/2) %>%
   # filter to those strata with more than 50 samples
@@ -4254,7 +4375,7 @@ eth_corr_list <- lapply(ethnicity_features, function(ethnicity){
   print(paste("working with", ethnicity, "feature"))
   tmp <- train_soa_final %>% 
     # round to nearest 0.5
-    mutate(strata = round(.data[[ethnicity]], 1)) %>%
+    dplyr::mutate(strata = round(.data[[ethnicity]], 1)) %>%
     # filter to those strata with more than 50 samples
     filter(strata <= 1) %>%
     # group the data by strata
@@ -4263,10 +4384,9 @@ eth_corr_list <- lapply(ethnicity_features, function(ethnicity){
   colnames(tmp) <- c("strata", ethnicity)
   tmp
 })
-
 # create starter data frame
-eth_corr <- data.frame(eth_corr_list[1])
-# loop around and add each table to the data frame
+eth_corr <- data.frame(eth_corr_list[1]) 
+# loop around and add a column from each table to the data frame
 for(i in 2:length(eth_corr_list)) {
   eth_corr <- 
     eth_corr %>%
@@ -4280,14 +4400,20 @@ eth_corr %>%
   filter(correlation >= 0.4) %>%
   ggplot(aes(strata, correlation, col=ethnicity))  + 
   geom_line() +
+  geom_hline(yintercept=0.905) +
+  geom_text(aes(0.5, 0.905,
+                label="Overall correlation coefficient"),
+            nudge_y=0.010, size = 3.5, col="black") +
   ggtitle("Correlation by ethnicity between y and level4 in SOA") +
   xlab("proportion of residents with ethnicity") +
   ylab("correlation between y and level4 qualifications")
 
 # tidy
-rm(eth_corr_list, eth_corr) 
-rm(tmp)
-
+rm(eth_corr_list, eth_corr, ethnicity) 
+rm(train_msoa_ethnicity_p, train_msoa_level4_p)
+rm(train_msoa_rcorr, train_soa_rcorr)
+rm(train_soa_level4_p, train_soa_ethnicity_p)
+rm(i, ethnicity_features)
 
 # look at ratios of ethnicity and occupation and qualification in countries in the UK
 ## download the data
@@ -4307,110 +4433,110 @@ data <- ingest("dc5202ew", geographytype)
 # put together a table with the level4 qualifications by ethnicity
 ethnicity_level4_25_64_raw <- data %>%
   #keeping only the data relating to age 25 to 64
-  select(contains("geography") | 
+  dplyr::select(contains("geography") | 
            contains("Age 25 to 34") |
            contains("Age 35 to 49") | 
            contains("Age 50 to 64") ) %>%
   #keeping only the data relating to Highest Level of Qualification: Level 4 qualifications 
-  select(contains("geography") | contains("Highest Level of Qualification: Level 4 qualifications") ) %>%
+  dplyr::select(contains("geography") | contains("Highest Level of Qualification: Level 4 qualifications") ) %>%
   # adding up the year groups
   rowwise() %>%
-  mutate("all_25_64" = 
+  dplyr::mutate("all_25_64" = 
            sum(across(contains("Ethnic Group: All categories"))) ) %>%
-  mutate("white_uk_25_64" = 
+  dplyr::mutate("white_uk_25_64" = 
            sum(across(contains("Ethnic Group: White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
-    mutate("white_irish_25_64" = 
+  dplyr::mutate("white_irish_25_64" = 
              sum(across(contains("Ethnic Group: White: Irish"))) ) %>%
-    mutate("white_other_25_64" = 
+  dplyr::mutate("white_other_25_64" = 
            sum(across(contains("Ethnic Group: White: Other White"))) ) %>%
-    mutate("mixed_25_64" = 
+  dplyr::mutate("mixed_25_64" = 
              sum(across(contains("Ethnic Group: Mixed/multiple ethnic group"))) ) %>%
-    mutate("asian_25_64" = 
+  dplyr::mutate("asian_25_64" = 
            sum(across(contains("Ethnic Group: Asian/Asian British"))) ) %>%
-    mutate("black_25_64" = 
+  dplyr::mutate("black_25_64" = 
              sum(across(contains("Ethnic Group: Black/African/Caribbean/Black British"))) ) %>%
-    mutate("other_25_64" = 
+  dplyr::mutate("other_25_64" = 
            sum(across(contains("Ethnic Group: Other ethnic group"))) ) %>%
-  rename("geo_name" = "geography") %>%
-  select(contains("geo_name") | contains("25_64")) %>%
+  dplyr::rename("geo_name" = "geography") %>%
+  dplyr::select(contains("geo_name") | contains("25_64")) %>%
   filter(geo_name == "England and Wales")
 
 # put together a table with all the 25 to 64 residents with the same data
 ethnicity_all_25_64_raw <- data %>%
   #keeping only the data relating to age 25 to 64
-  select(contains("geography") | 
+  dplyr::select(contains("geography") | 
            contains("Age 25 to 34") |
            contains("Age 35 to 49") | 
            contains("Age 50 to 64") ) %>%
   #keeping only the data relating to Highest Level of Qualification: All, to give all residents 25 to 64 by ethinicity 
-  select(contains("geography") | 
+  dplyr::select(contains("geography") | 
            contains("Highest Level of Qualification: All categories:") ) %>%
   # adding up the year groups
   rowwise() %>%
-  mutate("all_25_64" = 
+  dplyr::mutate("all_25_64" = 
            sum(across(contains("Ethnic Group: All categories"))) ) %>%
-  mutate("white_uk_25_64" = 
+  dplyr::mutate("white_uk_25_64" = 
            sum(across(contains("Ethnic Group: White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
-  mutate("white_irish_25_64" = 
+  dplyr::mutate("white_irish_25_64" = 
            sum(across(contains("Ethnic Group: White: Irish"))) ) %>%
-  mutate("white_other_25_64" = 
+  dplyr::mutate("white_other_25_64" = 
            sum(across(contains("Ethnic Group: White: Other White"))) ) %>%
-  mutate("mixed_25_64" = 
+  dplyr::mutate("mixed_25_64" = 
            sum(across(contains("Ethnic Group: Mixed/multiple ethnic group"))) ) %>%
-  mutate("asian_25_64" = 
+  dplyr::mutate("asian_25_64" = 
            sum(across(contains("Ethnic Group: Asian/Asian British"))) ) %>%
-  mutate("black_25_64" = 
+  dplyr::mutate("black_25_64" = 
            sum(across(contains("Ethnic Group: Black/African/Caribbean/Black British"))) ) %>%
-  mutate("other_25_64" = 
+  dplyr::mutate("other_25_64" = 
            sum(across(contains("Ethnic Group: Other ethnic group"))) ) %>%
-  rename("geo_name" = "geography") %>%
-  select(contains("geo_name") | contains("25_64")) %>%
+  dplyr::rename("geo_name" = "geography") %>%
+  dplyr::select(contains("geo_name") | contains("25_64")) %>%
   filter(geo_name == "England and Wales")
 
 # load in the Occupation by ethnic group by sex by age data
 # https://www.nomisweb.co.uk/census/2011/dc6213ew
-geographytype <- "TYPE499"
+# geographytype <- "TYPE499"
 data <- ingest("dc6213ew", geographytype)
 
 # put together a table with the level4 qualifications by ethnicity
 ethnicity_y_25_64_raw <- data %>%
   #keeping only the data relating to all (not by gender)
-  select(contains("geography") | 
+  dplyr::select(contains("geography") | 
            contains("Sex: All persons") ) %>%
   #keeping only the data relating to age 25 to 64
-  select(contains("geography") | 
+  dplyr::select(contains("geography") | 
            contains("Age 25 to 49") | 
            contains("Age 50 to 64") ) %>%
   #keeping only the data relating to Highest Level of Qualification: All, to give all residents 25 to 64 by ethinicity 
-  select(contains("geography") | 
+  dplyr::select(contains("geography") | 
            contains("Occupation: 1. Managers") |
            contains("Occupation: 2. Professional") ) %>%
   # adding up the year groups
   rowwise() %>%
-  mutate("all_25_64" = 
+  dplyr::mutate("all_25_64" = 
            sum(across(contains("Ethnic Group: All categories"))) ) %>%
-  mutate("white_uk_25_64" = 
+  dplyr::mutate("white_uk_25_64" = 
            sum(across(contains("Ethnic Group: White: English/Welsh/Scottish/Northern Irish/British"))) ) %>%
-  mutate("white_irish_25_64" = 
+  dplyr::mutate("white_irish_25_64" = 
            sum(across(contains("Ethnic Group: White: Irish"))) ) %>%
-  mutate("white_other_25_64" = 
+  dplyr::mutate("white_other_25_64" = 
            sum(across(contains("Ethnic Group: White: Other White"))) +
            sum(across(contains("Ethnic Group: White: Gypsy or Irish Traveller"))) ) %>%
-  mutate("mixed_25_64" = 
+  dplyr::mutate("mixed_25_64" = 
            sum(across(contains("Ethnic Group: Mixed/multiple ethnic group: Total"))) ) %>%
-  mutate("asian_25_64" = 
+  dplyr::mutate("asian_25_64" = 
            sum(across(contains("Ethnic Group: Asian/Asian British: Total"))) ) %>%
-  mutate("black_25_64" = 
+  dplyr::mutate("black_25_64" = 
            sum(across(contains("Ethnic Group: Black/African/Caribbean/Black British: Total"))) ) %>%
-  mutate("other_25_64" = 
+  dplyr::mutate("other_25_64" = 
            sum(across(contains("Ethnic Group: Other ethnic group: Total"))) ) %>%
-  rename("geo_name" = "geography") %>%
-  select(contains("geo_name") | contains("25_64")) %>%
+  dplyr::rename("geo_name" = "geography") %>%
+  dplyr::select(contains("geo_name") | contains("25_64")) %>%
   filter(geo_name == "England and Wales")
 
 # join together
 # pivot to long form
-ethnicity_y_25_64_Long <- ethnicity_y_25_64_raw %>%
+ethnicity_y_25_64_long <- ethnicity_y_25_64_raw %>%
   rename_at(vars(contains("_25_64")), ~str_replace_all(., "_25_64", "")) %>%
   pivot_longer(cols = -geo_name,
                names_to = "ethnicity",
@@ -4426,13 +4552,14 @@ ethnicity_25_64_raw <- ethnicity_all_25_64_raw %>%
   pivot_longer(cols = -geo_name,
                names_to = "ethnicity",
                values_to = "all_25_64") %>%
-  left_join(ethnicity_y_25_64_Long) %>%
+  left_join(ethnicity_y_25_64_long) %>%
   left_join(ethnicity_level4_25_64_long)
 
 # tidy
 save(ethnicity_25_64_raw, file="rda/ethnicity_25_64_raw.rda")
-rm(ethnicity_level4_25_64_long, ethnicity_y_25_64_Long, ethnicity_all_25_64_raw)
-rm(data)
+rm(ethnicity_level4_25_64_long, ethnicity_y_25_64_long, ethnicity_all_25_64_raw)
+rm(ethnicity_level4_25_64_raw, ethnicity_y_25_64_raw)
+rm(data, censusdata_list)
 
 # graph
 load("rda/ethnicity_25_64_raw.rda")
@@ -4440,7 +4567,7 @@ load("rda/ethnicity_25_64_raw.rda")
 ethnicity_25_64 <- ethnicity_25_64_raw %>%
   mutate(senior_occupation = occupation_25_64 / all_25_64) %>%
   mutate(level4_qualification  = qualification_25_64 / all_25_64) %>%
-  select(ethnicity, senior_occupation, level4_qualification)
+  dplyr::select(ethnicity, senior_occupation, level4_qualification)
 # put together a list in order based on the senior_occupation value
 ethnicity_graph_order <- ethnicity_25_64 %>%
   arrange(senior_occupation) %>% .$ethnicity
@@ -4468,12 +4595,4 @@ ethnicity_25_64 %>%
   xlab("Ethnic groups") +
   ylab("Proportion of each ethnic group")
 
-# tidy
-rm(ethnicity_25_64, ethnicity_graph_order)
-
-
-
-
-#### working code ####
-
-
+#####  the end ######
