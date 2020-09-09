@@ -3708,7 +3708,7 @@ rmse_results_soa %>% knitr::kable()
 #tidy 
 save(result_svmradial_train_soa, file="rda/result_svmradial_train_soa.rda")
 save(result_svmradial_train_soa_5k_top28,
-     file="result_svmradial_train_soa_5k_top28.rda")
+     file="rda/result_svmradial_train_soa_5k_top28.rda")
 save(rmse_results_soa, file="rda/rmse_results_soa.rda")
 rm(result_svmradial_train_soa_5k_top28, result_svmradial_train_soa_5k_top15)
 rm(result_svmradial_train_soa_5k_top10, result_svmradial_train_soa_5k_top5)
