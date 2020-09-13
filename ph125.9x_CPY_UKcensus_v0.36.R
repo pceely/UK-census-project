@@ -8,7 +8,7 @@
 # svn rev        78730                       
 # language       R                           
 # version.string R version 4.0.2 (2020-06-22)
-# with the latest packages installed
+# with the latest packages installed (as of beginning September 2020)
 #################### notes #######################
 # this code takes around 17 hours to run in total
 # it downloads files from the internet, storing locally
@@ -2373,6 +2373,7 @@ data.frame(result_bayesglm_train_set_final$y_hat,
   ylab("GLM predictions")
 
 #tidy
+save(result_bayesglm_train_set_final, file="rda/result_bayesglm_train_set_final.rda")
 rm(result_bayesglm_train_smaller)
 rm(result_bayesglm_train_set_final, result_bayesglm_train_small)
 rm(result_glm_train_set_final)

@@ -1,7 +1,7 @@
 ---
 title: "Choose Your Own project - Using UK census data to predict occupations"
 author: "Paul Ceely"
-date: "09/09/2020"
+date: "12/09/2020"
 output:
   pdf_document:
     toc: yes
@@ -37,42 +37,56 @@ options(digits = 6)
 \newpage
 # Executive summary
 <!-- recap of the entire document -->
+##  Introduction
 
-final project from the **EDX course HarvardX: PH125.9x Data Science: Capstone**.
+This project is the final part of the **EDX course HarvardX: PH125.9x Data Science: Capstone**, to apply machine learning techniques to publicly available data sets.  It is inspired by the UCI machine learning repository, to predict wages based on census data, but focusing on the UK, and using the UK 2011 census data. 
 
-machine learning.
-inspired by the ...  UCI machine learning repository, Black lives matter movement and reporting.
-developed a new data set from the raw census data to enable answering the following question:
+During the project a new continuous data set was developed from the 2011 UK census data, which was then cleaned and prepared for machine learning to answer the following challenge:
 
-* predict the proportion of working age people each area that are one of the managerial and professional occupations
+* predict the proportion of working age people in each area that are one of the managerial and professional occupations
 
-<!-- The most granular data is provided for "super output area" (SOA) an area defined for the census, of at least 100 people, but aiming for larger than 125 households, which provides over 130,000 data points providing a good level of detail and variability.  -->
-Focus was on the  Middle layer Super Output Areas - 2011" (MSOA) which gives around 7000 areas to work with MSOA areas, but the models and methodology were tested on a subset of the SOA at the end.
+The modelling was carried out by applying many different algorithms to focus down on the most effective ones, and with these building an ensemble.
 
-For this project, 
-approach was to look at a large number of models to identify which ones were most useful and then build an ensemble.
+In addition the project carried out detailed visualisations of the features, the important features and correlations to try and understand the drivers the for achievement of more senior roles.
 
+## Data set
 <!-- description of the data, and features -->
-summary tables of the outcome
+The final data set created from the census had 68 features of the following groups: Age; Ethnicity; Sex/gender; Qualifications; Marital status; Religion; Household composition; Industry; Country of birth; geographic region within England and Wales.  The categories were either summarised or directly taken from the census categories, and the input data was the census tables and the related tables on geographic areas.
 
-top 24 or so seemed most important
+There are various levels of detail for the census data, and the main focus was to use the "Middle layer Super Output Areas - 2011" (MSOA) which gives around 7,000 areas/observations.  The models and methodology were tested on a subset of the most granular data "Super Output Areas - 2011", with over 42,000 observations.
 
+
+
+
+## Results
 <!-- results recap -->
-Good prediction accuracy for the final model for MSOA.  SOA not so much.
-entir
+Overall the proportion of people with senior roles is quite predictable given the features provided.  The root mean error of 0.013991 is small given the range of 0.06 to 0.66, and even the less well performing SOA areas achieved 0.043189 with a larger range of 0 to 0.89.
+
+The optimal result for the MSOA data was from an ensemble of two models Support Vector Machines with a radial kernel (svmRadial) and Generalized Additive Model using Splines (GAM).
+
+The optimal result for SOA was also an ensemble of 2 models, Support Vector Machines with a radial kernel (svmRadial) again, but in this case Stochastic Gradient Boosting (GBM) as the second.
+
+The models show that the achievement of senior management and professional occupations is closely linked to the level4 qualification, hence linear regression based algorithms perform well.
 
 
+## Conclusions
 <!-- Conclusion recap -->
+The machine learning analysis was able to make a significant stepwise improvement during the project by working with many algorithms and constructing a final ensemble, from a baseline RMSE of 0.091347 to 0.014253 for MSOA.  The best models were based on linear regression and more recent, popular boosting or additive variants.  There were problems working with the larger data sets, however it was possible to generate results.
+
+A key conclusion, reflected in discussion of AI and ML recently is that in general the models lack of interpretability.  Many have no indication of feature importance, and the feature investigation at the end appeared to show some implications which were not highlighted in model outputs. 
+
+By far and away the most important feature for a high quality occupation is achieving good qualifications. In addition age, female ratio, lone parent, and white ethnicities were highlighted.
+
+The analysis of the features does appear to show evidence supporting the issues being raised in the campaigns, press and politics.  For example "white uk" was negatively correlated with both senior occupations and qualifications; in contrast, other white ethnicities, "white Irish" and "white other" were both highly qualified and with the best jobs; there was a relatively poor occupation achievement for "black other" and "black African", despite better qualifications than average.  This data appears to support the themes reported such as a lack of opportunity for non-white ethnicities; and there are 'left behind' poorly qualified white UK areas, contrasting with better qualified non-UK white people over-represented with the best jobs, the majority being born in the EU.  In addition "lone parent" and "divorced" have clear negative correlations for the best occupations. 
+
+The data set worked as a continuous machine learning problem, it behaved well, with sensible results and a variation in different results from different algorithms, although too many features.  With the SOA data there is potential for a very large data set of 130,000 observations in England and Wales, with 68 features, over 6 million pieces of publicly available data. The analysis indicated that all features had benefit for predictions, but the top 28 were most important.
 
 
-
-
+## Document structure
 <!-- apology/explanation for the length of the document -->
-The document is long, as it includes the majority of the code, which is in turn long due to the large amount of data wrangling to put the data set together from the ran census information, and additionally due to trying modelling on a large number of algorithms to identify the best for the final ensemble.
+This report covers all of the analysis and development of the initial data set, the various models, and finally some analysis and visualisation of the features.
 
-
-
-
+The document is long, as it includes a lot of graphs/plots, and the majority of the code.  The code is in turn long due to the large amount of data wrangling to put the data set together from the ran census information, and additionally due to trying modelling on a large number of algorithms to identify the best for the final ensemble.
 
 *******
 \newpage
@@ -86,15 +100,13 @@ This project is part of the **EDX course HarvardX: PH125.9x Data Science: Capsto
 The project is inspired by the UCI machine learning repository, to predict wages based on census data, here https://archive.ics.uci.edu/ml/datasets/Adult, and also the recent Black Lives Matter movements and recognition of the under-representation of certain groups in senior positions within society.
 https://www.theguardian.com/business/2020/jul/28/bame-representation-uk-top-jobs-colour-of-power-survey 
 
-Instead this project focuses on the UK, and uses the UK 2011 census data.  This data does not have individual information, instead numbers within a geographical area, and in addition, it does not include pay, but does include occupation.
+This project focuses on the UK, and uses the UK 2011 census data.  This data does not have individual information, instead providing the numbers of residents within a geographical area, and in addition,  and instead of pay, it uses the occupation types.  Therefore the challenge is to:
 
-Therefore the challenge is to:
-
-* predict the proportion of working age people each area that are one of the managerial and professional occupations
+* predict the proportion of working age people in each area that are one of the managerial and professional occupations
 
 As the target it to predict the proportion in an area, this can be treated as continuous problem, even though the actual underlying decision is a categorical, with a binary outcome, professional/managerial or not.
 
-The accuracy / error evaluation methodology will be developed through the work, but initially, as this is a continuous problem, it would be appropriate to use a loss function.  The simplest is the root mean squared error (RMSE) for each geo location area.
+As this is a continuous problem, it would be appropriate to use a loss function, and this project uses the simplest, the root mean squared error (RMSE) for each geo location area.
 
 As well as a machine learning exercise, the project aims to gain some understanding of the underlying causes of differences, and therefore there will be a preference for techniques that permit some interpretation.
 
@@ -102,38 +114,44 @@ As well as a machine learning exercise, the project aims to gain some understand
 ## Key steps   
 Key steps carried out:  
 
-1.  Identify potentially useful data from the UK Census
-2.  Import data, clean up, create the values to predict
-3.  Create project data set and the validation set
+1.  Identify potentially useful data from the UK census
+2.  Import data, create the values to predict and the features, summarising where appropriate
+3.  Create project data set and the validation set,  clean up the features
 4.  Initial investigation and visualisation
 5.  Create a training and test set
 6.  Further data exploration including baseline of prediction
-7.  Training and testing a variety of models
-8.  Building an ensemble
+7.  Training and testing a variety of algorithms
+8.  Building an ensemble, including further feature prioritisation
 9.  Finalising a model and running on the validation set
-10. Run on more detailed data set to confirm the models
+10. Attempt with the more detailed SOA data set to confirm the models
 11. Interpretation, and investigation in to feature importance
 
 The methodology and code was developed using insight gained from the course, and also in the accompanying text book **An Introduction to Data Science, by Rafael A Irizarry,  https://rafalab.github.io/dsbook/**.
 
 \newpage
 # Methodology and data preparation
-<!-- a methods/analysis section that explains the process and techniques used, including data cleaning, data exploration and visualization, insights gained, and your modeling approaches (you must use at least two different models or algorithms); -->
+<!-- a methods/analysis section that explains the process and techniques used, including data cleaning, data exploration and visualization, insights gained, and your modelling approaches (you must use at least two different models or algorithms); -->
+This section describes the data sources, the process to download and develop the features from the raw tables, the creation of the main/validation and train/test data sets, as well as the initial data exploration, and finally, creating the data sets to use for modelling.
+
+The data was downloaded and combined in to 62 columns of data, and from these, the geographic regions were included to create a data set of 68 features and one outcome, being the proportion of managerial and professional roles.
+
+There were some features with little variability and some highly correlated, which may be useful for simplifying the data sets during the analysis.
+
 
 ## Identification of data sources
-<!-- 1.  Identify potentially useful data from the UK Census -->
+<!-- 1.  Identify potentially useful data from the UK census -->
 
 The most recent census in the UK is in 2011.  The information on the Office for National Statistics (ONS) was used as a starting point for the data, here https://www.ons.gov.uk/census/2011census/2011censusdata/2011censususerguide/variablesandclassifications.
 
 This links to the Nomis web site, provided buy Durham University on behalf of the ONS, as the source of official labour market statistics.  The following link provides a list of the tables from the 2011 UK census  https://www.nomisweb.co.uk/census/2011/data_finder 
 
-The most granular data is provided for "super output area" (SOA) an area defined for the census, of at least 100 people, but aiming for larger than 125 households, which provides over 130,000 data points providing a good level of detail and variability.  This is a very large data set, and will be challenging to develop a new methodology for it, and therefore this study will focus on a smaller data set, however, the SOA will be tested at the end to verify that the methodology works.
+The most granular data is provided for "Super Output Areas" (SOA) an area defined for the census, of at least 100 people, but aiming for larger than 125 households, which provides over 130,000 data points providing a good level of detail and variability.  This is a very large data set, and will be challenging to develop a new methodology for it, and therefore this study will focus on a smaller data set, however, the SOA will be tested at the end to verify that the methodology works.
 
-The Middle layer Super Output Areas - 2011" (MSOA) is a suitable level or granularity, with good detail from the various tables, with around 7000 areas to work with.
+The "Middle layer Super Output Areas - 2011" (MSOA) is a suitable level or granularity, with good detail from the various tables, with around 7000 areas to work with.
 
-For the initial data processing and  preparation, cleanup and cross checking the numbers between the tables the "regions" geographic areas will be used for ease of troubleshooting.
+For the initial data processing and  preparation, clean up and cross checking the numbers between the tables the "regions" geographic areas will be used to ease troubleshooting.
 
-There appears to be more detailed data available for England and Wales, enabling further clean up (for example, to baseline on the same totals, working age and so on), and therefore this will be used.
+The data will focus on England and Wales because there is more detailed data available which enables further clean up (for example, to baseline on the same working age resident numbers and so on).
 
 The following are the data tables from the census used to construct the data.  The focus is on indicators, trying to avoid information which may be due to the effects of having a good job such as size of house and so on.  The UCI data set also provided guidance on suitable data to be developed in to the features.
 
@@ -158,28 +176,25 @@ Table: Census variables with name and location of the data tables
 | Country of birth | https://www.nomisweb.co.uk/census/2011/qs203ew |
 |                    | https://www.nomisweb.co.uk/census/2011/lc2103ew |
 
-Other potential predictors could be:
+There are other potential predictors such as 'Housing type', but this is possibly related to how much money earned, so effect rather than cause?
 
-* Housing type
-+ Possibly related to how much money earned, so effect rather than cause?
-
-It may be possible to map the occupation to earnings with other data, such as:
+It may be possible to map the occupation to earnings with other data, but this was not carried out, such as:
 https://www.ons.gov.uk/datasets/ashe-table-8-earnings/editions/time-series/versions/1#id-dimensions.
 
 
 ## Data preparation
 <!-- 2.  Import data, clean up, create the values to predict -->
 
-This section describes the source data and how it is converted in to the features used in the modelling, as well as initial data exploration.
+This section describes how the data is downloaded and converted in to the features used in the modelling, and includes most of the code used for "data wrangling".
 
-In summary, this study will use the MSOA geographic areas for England and Wales, with data sourced from 9 tables from the nomis census data published online.
+To recap, this study will use the MSOA geographic areas for England and Wales, with data sourced from 9 tables from the Nomis census data published online.
 
-Working wih the occupation data initially, the target values will be created as a proportion of the residents in an area, so a fraction of 1.  The other data sources will be addressed in a similar way to produce the features, developing values that are proportions of residents, trying to use a similar cohort as the occupation data.
+Working with the occupation data initially, the target "y" values are created as a proportion of the residents in an area, so a fraction of 1.  The other data sources will be addressed in a similar way to produce the features, developing values that are proportions of residents, trying to use a similar cohort as the occupation data.
 
 
 ### Data import
 
-A function was created to download the files from Nomis, which for a given geography type and table name, saved the csv files to the ~/data directory.
+A function was created to download the files from Nomis, for a given geography type and table name, saving the csv files to the ~/data directory.
 
 ``` {r downloading data from nomis, eval=FALSE}
 # test geo type
@@ -248,7 +263,7 @@ ingest <- function(censustable, geography){
 
 This requires working with the occupation information in table ks608.
 
-There are 9 Occupation types, and we are combining the first two and the remaining 7:
+There are 9 Occupation types, and we are combining the first two and the remaining seven:
 
 * Occupation: 1. Managers, directors and senior officials
 * Occupation: 2. Professional occupations
@@ -260,7 +275,7 @@ There are 9 Occupation types, and we are combining the first two and the remaini
 * Occupation: 8. Process plant and machine operatives
 * Occupation: 9. Elementary occupations
 
-The $y$ value is then simply the ratio of the sum of Occupations 1 and 2, and the sum of all occupations.
+The $y$ value is proporition of residents with managerial or professional occupations, simply the sum of residents who have Occupations 1 and 2, divided by the sum of all residents.
 
 ```{r create the y value, eval=FALSE}
 #load in occupation data
@@ -334,13 +349,13 @@ names(data_set)
 ```
 
 
-#### Age feature
+### Age feature
 
 There are many columns, for a predictor, Median will be used as it has more variation than mean.
 
 In order to have the baseline for the features correct, it is necessary to understand the difference in numbers of residents in the occupation table, which may be working age.
 
-Typically in the census, there is a breakdown of 16-74, as well as 25-64, but those age ranges are still larger than the Occupation total, and excerpt of the table is included.
+Typically in the census, there is a breakdown of ages 16-74, as well as 25-64, but those age ranges are still larger than the Occupation total, and excerpt of the table is included.
 
 ```{r ingesting the age information, eval=FALSE}
 # load in age data
@@ -442,7 +457,7 @@ data_set_save(data_set)
 
 ### Ethnicity feature
 
-In order to choose just the working age people, a table was required with both age and ethnicity, with summarisation to the 25-64 age group.  There are many subdivisions, the top 11 ethnicities, over of 0.5% population were chosen, with others aggregated following the structure used by the Census.  This was chosed as there are reported differences for outcomes for Bangladeshi Britons which is the 11th ethnicity.  The top ones are:
+In order to choose just the working age people, a table was required with both age and ethnicity, with summarisation to the 25-64 age group.  There are many subdivisions, the top 11 ethnicities, over of 0.5% population were chosen, with others aggregated following the structure used by the census.  This was chosen as there are often reports in the press regarding issues specific to Bangladeshi Britons which is the 11th ethnicity.  The top ones are:
 
 ```{r priority ethinicities}
 # reordering to identify which are the largest groups to retain
@@ -694,7 +709,7 @@ data_set <- data_set %>%
 
 ### Religion feature
 
-As for the marital features.  There are a number of religions with a small number of people, and it may make sense to aggregate them in to "other".  Hoever, with the same cutoff of 0.5% as earlier, only one religion is summarised, "Jewish", therefore it can be left as it is.
+There are a number of religions with a small number of people, and it may make sense to aggregate them in to "other".  However, with the same cut-off of 0.5% as earlier, only one religion is summarised, "Jewish", therefore it can be left as it is.
 
 ```{r creating the religion features, eval=FALSE}
 # next religion
@@ -1249,7 +1264,7 @@ heatmap(x = correlationmatrix,
         main="Heatmap of feature correlation with main data set")
 ```
 
-Following are the list of highly correlated features, which can be seen in a version of the image with the features reorded, with a number very similar to each other at the left and bottom rows.
+Following are the list of highly correlated features, which can be seen in a version of the image with the features re-orded, with a number very similar to each other at the left and bottom rows.
 
 ```{r highly correlated features}
 # find attributes that are highly corrected
@@ -1361,7 +1376,7 @@ This will only be useful if the algorithms treat the number representing the geo
 This would be unwieldy with hundreds of areas as columns, and so the regions need to be larger.  There is a further lookup from the local area (LAD) to a smaller number of regions in England (Wales is effectively a single region), as described here.
 https://geoportal.statistics.gov.uk/datasets/local-authority-district-to-region-december-2018-lookup-in-england
 
-This lookup is then used to can use this to map each SOA/MSOA/LAD a specific region, which is in turn used to create columns.  The region names are used, added to the geo_lookup created earlier, via an interim "region_lookup" file.  Note that the MSOA in Wales had blank region names, and much of the complexity below is to add the wales name in, and to deal with a blank line in data.
+This lookup is then used to can use this to map each SOA/MSOA/LAD a specific region, which is in turn used to create columns.  The region names are used, added to the geo_lookup created earlier, via an interim "region_lookup" file.  Note that the MSOA in Wales had blank region names, and much of the complexity below is to add the Wales name in, and to deal with a blank line in data.
 
 ```{r create region columns, eval=FALSE}
 # in addition creating a column per region
@@ -1483,7 +1498,7 @@ This leads to the following insight and recommendations:
 
 * create ratio of occupied/all residents
 * create local area feature, both numeric and columns for regions
-* remove occupation & all_residents population numbers, geo name  & geo type
+* remove occupation & all_residents population numbers, geo name & geo type
 * some features have little variation, and could be removed if needed
 * some features are highly correlated and could be removed if needed
 
@@ -1509,7 +1524,7 @@ The final test and training data for the modelling was created with a function w
 * create geographic area features
 * remove occupation & all_residents population numbers, geo name  & geo type
 
-THe geographic features were created using the lookup prepared in the previous section.  In addition, the below includes if" statements to be able to handle the different area types, the SOA and MSOA, as they require slightly different lookups for the geographic region.
+The geographic features were created using the lookup prepared in the previous section.  In addition, the below includes "if" statements to be able to handle the different area types, the SOA and MSOA, as they require slightly different lookups for the geographic region.
 
 ```{r function to clean the data for modelling, message=FALSE, warning=FALSE}
 load("rda/geo_lookup.rda")
@@ -1592,7 +1607,7 @@ rmse_results %>% knitr::kable(caption="Initial baseline RMSE on an SOA with a me
 \newpage
 # Modelling
 
-This section covers the machine learning modelling to develop the optimal model, and exploring the benefits of an ensemble model.  In addition, it covers selection of optimal features for the models, selection of models, and some visualisation of errors.
+This section covers working with the machine learning algorithms to develop the optimal model, and exploring the benefits of an ensemble model.  In addition, it covers selection of optimal features for the algorithms, selection of models, and some visualisation of errors.
 
 
 ## Feature selection
@@ -1604,7 +1619,7 @@ From the earlier investigation, some features had low variability, and some were
 
 ### Low variance features
 
-The low variance candidates have a mean <=0.05, standard deviation <=0.015, and max <0.15, which are the following.
+The low variance candidates have a mean <=0.05, standard deviation <=0.015, and maximum <0.15, which are the following.
 
 ```{r table of potential features to remove, warning=FALSE, message=FALSE}
 # low variation
@@ -1669,7 +1684,7 @@ heatmap(x = correlationmatrix,
         main="Heatmap of feature correlaton with the train_set_final")
 ```
 
-This generates a short list of features to remove.  A cutoff of 0.8 was selected, with illustrations below.
+This generates a short list of features to remove.  A cut-off of 0.8 was selected, with illustrations below.
 
 ```{r highly correlated feature list}
 # find attributes that are highly corrected
@@ -1687,7 +1702,7 @@ data.frame(correlationmatrix[,index][abs(correlationmatrix[,index]) > 0.7]) %>%
 
 ### Subset of data for initial testing
 
-The data set for training has 5832 observations of 70 variables.  Following are features that can be removed with limited impact, or to avoid categorical issues, in addition to removing the "geo-code" column as it is neither a predictor nor outcome:
+The data set for training has 5832 observations of 68 variables.  Following are features that can be removed with limited impact, or to avoid categorical issues, in addition to removing the "geo-code" column as it is neither a predictor nor outcome:
 
 Table: List of features to be removed for the smaller data sets
 
@@ -1794,7 +1809,7 @@ The model selection was carried out by grouping in to families, choosing one or 
   + Naive Bayes (classification)
   + Bayesian Generalized Linear Model	- bayesglm
 * Clustering, instance based
-  + k-Nearest Neighbor - knn
+  + k-Nearest Neighbour - knn
   + Support Vector Machines (other kernel) - svmLinear, svmRadial, svmRadialCost,  svmRadialSigma
   + Learning Vector Quantization (classification)
   + k-Means
@@ -1823,7 +1838,7 @@ https://machinelearningmastery.com/a-tour-of-machine-learning-algorithms/
 
 ### Modelling function
 
-A function was used to run the models without tuning, and store the data output in a list object, including the rmse.
+A function was used to run the models without tuning, and store the data output in a list object, including the RMSE.
 
 ```{r function to run the models}
 # creating a function to run the models with default settings
@@ -1866,9 +1881,9 @@ load("rda/train_set_final.rda")
 
 ### Generalized linear model - glm
 
-Starting with the simplest model, a linear model, using the Generalized linear model in the caret package, initally on the smallest training set, "train smaller" of 1000 observations of 15 features.
+Starting with the simplest model, a linear model, using the Generalized linear model in the caret package, initially on the smallest training set, "train smaller" of 1000 observations of 15 features.
 
-It takes no time, and gives a sensible order of importance for the variables, with "no qualification" first.  And it provides a significant improvement in the rmse from 0.096470 to 0.039643.
+It takes no time, and gives a sensible order of importance for the variables, with "no qualification" first.  And it provides a significant improvement in the RMSE from 0.096470 to 0.039643.
 
 ```{r initial glm model, message=FALSE, warning=FALSE}
 # initial the straightforward glm model
@@ -1940,20 +1955,7 @@ Table: GLM model RMSE results for MSOA
 |Mean of all locations             | 0.0964704|
 |"glm" - train_set_final           | 0.0166809|
 
-
-#### Insights and visualisation
-
-The following were important features from the various versions of the model.
-
-* all qualifications, level 4
-* age_median
-* oneperson_25_64
-* loneparent_25_64
-* cohoabiting_25_64
-* construction_25_64
-* eu_rest_25_64
-
-Plotting the 9 most important features for GLM vs the outcome y, to visualise the links between the top features and the outcome, y, the proportion of residents with senior manager or professional occupation.
+Following is the plot of the 9 most important features for GLM against the outcome y, to visualise the links between the features and the outcome, y, the proportion of residents with senior manager or professional occupation.  'Level4 qualification', 'no qualification' and 'industry klmn' have the clearest links.
 
 ```{r plots of important features vs y, fig.height=4}
 #plotting important features vs y
@@ -2111,12 +2113,12 @@ But given the gap to the leading model, there are many other algorithms to look 
 
 Table: KNN model RMSE results for MSOA
 
-|method                                  |      rmse|
-|:---------------------------------------|---------:|
-|Mean of all locations                   | 0.0964704|
-|"glm" - train_set_final                 | 0.0166809|
-|"knn" - train_set_knn_final_nocat       | 0.0237531|
-|"knn" - train_set_knn_final_nocat, k=13 | 0.023508 |
+|method                                  |     rmse|
+|:---------------------------------------|--------:|
+|Mean of all locations                   | 0.096470|
+|"glm" - train_set_final                 | 0.016681|
+|"knn" - train_set_knn_final_nocat       | 0.023753|
+|"knn" - train_set_knn_final_nocat, k=13 | 0.023508|
 
 
 ### Tree model CART - rpart
@@ -2204,7 +2206,7 @@ It runs well, on the all data sets, with results very similar to the GLM and SVM
 There is information on importance of variables, and it can handle the categorical features, with a small improvement.
 
 ```{r stochastic gradient boosting gbm, eval=FALSE}
-# using the gbmm plyr, package
+# using the gbm plyr, package
 if (!require('gbm')) install.packages('gbm'); library('gbm')
 if (!require('plyr')) install.packages('plyr'); library('plyr')
 # with the full train set
@@ -2228,7 +2230,7 @@ Table: GBM model RMSE results for MSOA
 
 ### Multilayer Perceptrons - mlp
 
-This is part of the artifical neural network family so a different set of machine learning algorithms.
+This is part of the artificial neural network family so a different set of machine learning algorithms.
 
 It works, but produces a fairly poor result with the smaller data set, taking a minute or so.  And the small data set took a minute or two, with some errors, with a worse RMSE than the earlier result.  The package had some interoperability issues with the caret package used throughout the rest of the analysis, so the analysis has not been used to avoid creating problems with reviewers' R installations.
 
@@ -2237,7 +2239,7 @@ It works, but produces a fairly poor result with the smaller data set, taking a 
 
 As GLM is still the leading model, and the linear version of SVM also performed well, another linear model was selected.  GAM is another successful algorithm, which can be considered as part of the linear regression family.  It operates by adding regression lines on top of each other (which additive in the name refers to), using a smoothing function, in this case a function called "splines".
 
-It worked well with the smaller data set, and does provide the important variables, for the smaller set, being loneparent.
+It worked well with the smaller data set, and does provide the important variables, for the smaller set, being 'loneparent'.
 
 It runs slowly though, and did not complete the training with the "small" data set, with increased observations and features. 
 
@@ -2277,7 +2279,7 @@ Table: GAM model RMSE results for MSOA, with other results for smaller data sets
 
 ### Least Absolute Shrinkage and Selection Operator - lasso
 
-Again looking at linear regression models, related to GLM, another model is Lasso, a regularisation model, or logic regression.  It produces decent results with the smaller training set, with quick results from the other data set, handling categorical data.  But the rmse results look identical to the GLM model.
+Again looking at linear regression models, related to GLM, another model is Lasso, a regularisation model, or logic regression.  It produces decent results with the smaller training set, with quick results from the other data set, handling categorical data.  But the RMSE results look identical to the GLM model.
 
 Table: Lasso model RMSE results for MSOA
 
@@ -2315,7 +2317,7 @@ result_lasso_train_final_nocat <- results_train_method(train_final_nocat, "lasso
 rmse_results <- bind_rows(rmse_results, tail(result_lasso_train_final_nocat$results, 1))
 rmse_results %>% knitr::kable()
 
-# does it work with categortical?
+# does it work with categorical?
 train_lasso <- train(y ~ ., method = "lasso", data = train_smaller_cat)
 #yes it does
 
@@ -2571,7 +2573,7 @@ load("rda/importance_glmboost.rda")
 plot(importance, 10)
 ```
 
-Reviewing the model, it looks like the number of iterations of "boosting" could be increased which would increase the accuracy.  However, it is far away from the leading models, and this would not close that large a gap, and also, that is likely to overfit the specific train/test data sets.
+Reviewing the model, it looks like the number of iterations of "boosting" could be increased which would increase the accuracy.  However, it is far away from the leading models, and this would not close that large a gap, and also, that is likely to over fit the specific train/test data sets.
 
 ```{r glmboost tuning parameters}
 # tuning for glmboost
@@ -2645,7 +2647,7 @@ Table: SVM Linear2 model RMSE results for MSOA and comparison with SVM Linear
 |"svmLinear2" - train_smaller                 | 0.039501|
 |"svmLinear2" - train_set_final               | 0.016748|
 
-Visual inspection shows a small difference with the RMSE and also the y_hats seem very close, tracking each other, with a "Mean relative difference" through the all.equal function of 0.0003343818.  The project will focus on the svmlinear and not explore this version any further.
+Visual inspection shows a small difference with the RMSE and also the y_hats seem very close, tracking each other, with a "Mean relative difference" through the all.equal function of 0.000334.  The project will focus on the svmlinear and not explore this version any further.
 
 ```{r comparing svmlinear and svmlinear2}
 load("rda/result_svm2_train_set_final.rda")
@@ -2675,14 +2677,6 @@ This model runs a little more quickly than the svmlinear and svmlinear2 models, 
 # uses package kernlab
 if (!require('kernlab')) install.packages('kernlab'); library('kernlab')
 
-# with the full train set, less categorical
-result_svmradial_train_final_nocat <- 
-  results_train_method(train_final_nocat, test_set_final, "svmRadial")
-# extract the rmse from the results
-rmse_results <- bind_rows(rmse_results,
-                          tail(result_svmradial_train_final_nocat$results, 1))
-rmse_results %>% knitr::kable()
-
 # with the full train set
 result_svmradial_train_set_final <- results_train_method(train_set_final, "svmRadial")
 # extract the rmse from the results
@@ -2706,7 +2700,6 @@ Table: SVM Radial model RMSE results for MSOA
 |:-------------------------------|---------:|
 |"glm" - train_set_final         | 0.0166809|
 |"svmLinear" - train_set_final   | 0.0167375|
-|"svmRadial" - train_final_nocat | 0.0157481|
 |"svmRadial" - train_set_final   | 0.0145255|
 
 
@@ -2717,22 +2710,22 @@ The table below shows the leading models being SVM Radial, and behind that the G
 
 Table: Summary of model RMSE performance for MSOA
 
-|Name     | Family              | Results         | RMSE    | Speed  |Importance|
-|:--------|:--------------------|:----------------|:--------|:-------|:---------|
-|svmRadial  | clustering       | very good      | 0.014525| medium | no  |
-|glm      | linear regression   | very good     | 0.016681| fast | yes  |
-|svmlinear| linear / clustering | very good     | 0.016737| slow | no   |
-|gbm      | boosted trees      | good          | 0.017467| medium | yes |
-|ranger     | tree / random forest | ok/good     | 0.018276| v slow | no |
-|avNNet     | deep learning      | ok/good      | 0.019568| medium | no |
-|glmboost   | boosted linear     | ok           | 0.020032| fast   | yes |
-|gam      | regression         | good on smaller| 0.036524| slow   | yes |
-|gamLoess  | regression        | good on smaller| 0.038299| slow   | yes |
-|knn        | clustering       | poor           | 0.023753| medium | no |
-|pcr        | dimension reduction | poor          | 0.046037| fast   | no |
-|rpart      | tree             | poor           | 0.050706| fast   | yes |
-|mlp        | deep learning    | poor           |         | slow   | no |
+|Name     | Family              | Results        | RMSE    | Speed  |Importance|
+|:--------|:--------------------|:---------------|:--------|:-------|:---------|
+|svmRadial | clustering        | very good      | 0.014525| medium | no  |
+|glm       | linear regression   | very good     | 0.016681| fast | yes  |
+|svmlinear | linear / clustering | very good     | 0.016737| slow | no   |
+|gbm       | boosted trees      | good          | 0.017467| medium | yes |
+|ranger    | tree / random forest | ok/good     | 0.018276| v slow | no |
+|avNNet    | deep learning      | ok/good      | 0.019568| slow  | no |
+|glmboost  | boosted linear     | ok           | 0.020032| fast   | yes |
+|knn       | clustering         | poor           | 0.023753| medium | no |
+|gam       | regression          | good on smaller| 0.036524| v slow | yes |
+|gamLoess  | regression         | good on smaller| 0.038299| v slow | yes |
+|pcr       | dimension reduction | poor          | 0.046037| fast   | no |
+|rpart     | tree               | poor           | 0.050706| fast   | yes |
 
+mlp - conflict with other packages   
 svmLinear2 - similar to svmlinear   
 lasso - duplicate of the glm model   
 bayesglm - similar to the glm   
@@ -2888,7 +2881,6 @@ train_set_final %>%
   pivot_longer(cols = !"y", 
                names_to = "feature", 
                values_to = "value") %>%
-  filter(feature %in% feature_top9) %>% 
   ggplot(aes(y, value, col=feature))  + 
   geom_point(size=0.5) +
   facet_wrap(. ~feature,  scales = "free_y") +
@@ -2973,9 +2965,9 @@ train_top30 <- topfeature_overall(30, train_set_final)
 
 ```
 
-Using this a quick check shows that even though the importance of some of the features is low, they are making a significant improvement to the rmse, say for going from 15 to 20 features has a big drop.  Also, it shows that prioritising by overall mean score is better than the mean rank, as expected.
+Using this a quick check shows that even though the importance of some of the features is low, they are making a significant improvement to the RMSE, say for going from 15 to 20 features has a big drop.  Also, it shows that prioritising by overall mean score is better than the mean rank, as expected.
 
-```{r top 15 and 20 features with GLM, warning=FALSE, message=FALSE}
+```{r top 15 and 20 features with GLM, eval=FALSE}
 # running on the GLM model
 # with the top15 training set
 result_glm_train_top15 <- results_train_method(train_top15, "glm")
@@ -3000,6 +2992,10 @@ result_glm_train_top10_rank <- results_train_method(train_top10_rank, "glm")
 # extract the rmse from the results
 rmse_results <- bind_rows(rmse_results, 
                           tail(result_glm_train_top10_rank$results, 1))
+```
+
+```{r glm results with increasing numbers of features}
+load("rda/rmse_results.rda")
 rmse_results %>% 
   filter(str_detect(method, '"glm"') ) %>% 
   arrange(rmse) %>%
@@ -3110,7 +3106,7 @@ This indicates that the algorithms should use at least the top 24 features, as t
 
 The GAM and GAM Loess can be run with an optimised smaller set of features.  As the models did not work with the "small" set of 35 features, initially the top 25 features were used.
 
-For the GAM model, this achieves an RMSE of 0.0161365, better than all but the SVM Radial model.
+For the GAM model, this achieves an RMSE of 0.016136, better than all but the SVM Radial model.
 
 Trying with the top 28 features, and this was better still, achieving an RMSE of 0.015935.
 
@@ -3190,7 +3186,7 @@ data.frame(y_hat_gam, y_hat_gamloess) %>%
   ylab("number of predictions in each interval")
 ```
 
-The smaller set was also used with th KNN model, but although it was the best it had produced by some distance with an RMSE of 0.021077, it is still some distance behind the leading models.
+The smaller set was also used with the KNN model, but although it was the best it had produced by some distance with an RMSE of 0.021077, it is still some distance behind the leading models.
 
 ```{r knn with the top 28 features, eval=FALSE}
 # running on knn with 28 features, less age and area
@@ -3217,7 +3213,7 @@ rmse_results %>%
   knitr::kable(caption="Leading individual models")
 ```
 
-Creating an ensemble to include the GAM and GAM Loess just created, with five models (GLM, SVM Linear, SVM Radial, GAM, GAM Loess), averaging the prediction, the result is an RMSE of 0.0149383, vs the SVM Radial model of 0.014525, and only slightly better than the last ensemble of three (GLM, SVM Linear, SVM Radial), which is maybe because the strong performance of the GAM is counterbalanced by the relatively poor GAM Loess.
+Creating an ensemble to include the GAM and GAM Loess just created, with five models (GLM, SVM Linear, SVM Radial, GAM, GAM Loess), averaging the prediction, the result is an RMSE of 0.0149383, compared against the SVM Radial model of 0.014525, and only slightly better than the last ensemble of three (GLM, SVM Linear, SVM Radial), which is maybe because the strong performance of the GAM is counterbalanced by the relatively poor GAM Loess.
 
 ```{r ensemble3 with best five models including gam gamloess, eval=FALSE}
 #loading the separate model information
@@ -3258,7 +3254,7 @@ Table: Leading models including the ensembles, with MSOA
 |"gam" - train_top28                          | 0.015935|
 |"glm" - train_set_final                      | 0.016681|
 
-Creating an ensemble with the best three models, (GLM, SVM Radial, GAM), the result is an RMSE of 0.014395, vs the SVM Radial model of 0.0145255, so improving and now the best result overall.
+Creating an ensemble with the best three models, (GLM, SVM Radial, GAM), the result is an RMSE of 0.014395, compared to the SVM Radial model of 0.0145255, so improving and now the best result overall.
 
 ```{r ensemble4 with best three models, eval=FALSE}
 # an ensemble of the best three models
@@ -3378,7 +3374,7 @@ main_clean <- data_cleanse(main, "msoa")
 validation_clean <- data_cleanse(validation, "msoa")
 ```
 
-Now training and testing on the data sets, calculating mean as the the baseline, GLM as a comparison, and SVM Radial, all at default.  The mean is slightly better (0.091347 vs 0.096470), GLM worse (0.016939 vs 0.016681) and SVM Radial significantly worse (0.015654 vs 0.014525) than the performance using the train/test data.
+Now training and testing on the data sets, calculating mean as the the baseline, GLM as a comparison, and SVM Radial, all at default.  The mean is slightly better (0.091347 vs. 0.096470), GLM worse (0.016939 vs. 0.016681) and SVM Radial significantly worse (0.015654 vs. 0.014525) than the performance using the train/test data.
 
 ```{r mean glm svmradial on the main validation, eval=FALSE}
 # create baseline
@@ -3415,7 +3411,7 @@ Table: GLM and SVM Radial model RMSE results on the main/validation data for MSO
 
 Next, load the top28 features developed using the train/test data on GLM, GBM and GLM boost, and then run on the GAM model.  Note, the top28 ranking was developed earlier with information from the test as well as train data, but has not been developed with any data from the validation set.
 
-The GAM result with 28 features is almost identical to the earlier RMSE with the train/ test data (0.015931 vs 0.015935), meaning that in this case, the performance of the GAM 28 is close to that of the SVM Radial.
+The GAM result with 28 features is almost identical to the earlier RMSE with the train/ test data (0.015931 vs. 0.015935), meaning that in this case, the performance of the GAM 28 is close to that of the SVM Radial.
 
 ```{r gam top 28 on the main set, eval=FALSE}
 # run on gam
@@ -3433,7 +3429,7 @@ rmse_results <- bind_rows(rmse_results, tail(result_gam_main_top28$results, 1))
 rmse_results %>% knitr::kable()
 ```
 
-Running the final ensemble of SVM Radial and GAM on top 28, the result is a big step in accuracy, which is also closer to the results with the train/test set, (0.014253 vs 0.013991).  Overall the model has performed well on the main/validation set.
+Running the final ensemble of SVM Radial and GAM on top 28, the result is a big step in accuracy, which is also closer to the results with the train/test set, (0.014253 vs. 0.013991).  Overall the model has performed well on the main/validation set.
 
 ```{r final ensemble on the main data}
 # ensemble of 2
@@ -3557,7 +3553,7 @@ train_soa_final <- data_cleanse(train_soa, "soa")
 
 ### Initial baseline and visualisation
 
-As before, an initial baseline RMSE based on the mean was created, which is 0.133419, much worse than the MSOA data which was 0.096470.  This is as expected this, as there should be greated variability with the smaller areas.  It could be that focusing on two more extreme areas in the UK could exacerbate this.
+As before, an initial baseline RMSE based on the mean was created, which is 0.133419, much worse than the MSOA data which was 0.096470.  This is as expected this, as there should be greater variability with the smaller areas.  It could be that focusing on two more extreme areas in the UK could exacerbate this.
 
 ```{r rmse baseline for SOA}
 #### baseline rmse and rmse function
@@ -3660,7 +3656,7 @@ test_soa_final %>%
 
 Looking at the features, they are much broader as well, with many more outliers than the previous plot on the MSOA data.  Note how the mean for UK nationals has dropped, due to half of the data coming from London which tends to be the initial destination for migrants to the UK.
 
-```{r boxplot of SOA features}
+```{r boxplot of SOA features, fig.height=4}
 #looking at the features
 # box plot of features expressed as a ratio
 # identify the geography features not necessary for this graph
@@ -3737,7 +3733,7 @@ Table: GLM model RMSE results for SOA
 GBM took around fifteen minutes, and achieved a similar result to GLM, slightly better at 0.044361, but much worse than the result with the MSOA data.  For importance, it was almost completely reliant on the level4 qualification.
 
 ```{r gbm with soa, eval=FALSE}
-# using the gbmm plyr, package
+# using the gbm plyr, package
 if (!require('gbm')) install.packages('gbm'); library('gbm')
 if (!require('plyr')) install.packages('plyr'); library('plyr')
 # with the full train set
@@ -4037,6 +4033,7 @@ Table: GAM model RMSE results for SOA
 |:-----------------------------------|---------:|
 |Mean of all locations               | 0.1334185|
 |"gbm" - train_soa_final             | 0.0443612|
+|"svmRadial" - train_soa_15k_top28   | 0.0438095|
 |"gam" - train_soa_10k_top28         | 0.0458059|
 |"gam" - train_soa_top28             | 0.0461864|
 |"gam" - train_soa_15k_top28         | 0.0462241|
@@ -4145,7 +4142,7 @@ y_hat_ens_table6 %>%
 This section returns back to the motivation for this topic to consider achievements of top jobs in the context of the Black lives matter society wide debate.  
 https://www.theguardian.com/business/2020/jul/28/bame-representation-uk-top-jobs-colour-of-power-survey 
 
-Feature importance and correlation are analysed to see if there is data to enlighten the discussion, specifically focusing on the ethnicity features. 
+Feature importance and correlation are analysed to see if there is data to enlighten the discussion, specifically focusing on the ethnicity features.  This investigation does appear to show evidence supporting the issues being raised in the campaigns, press and politics - poorer outcomes for non-white ethnicities, better qualified non-UK white ethnicities over-represented with the best jobs, and perhaps 'left behind' poorly qualified white areas.
 
 
 ## Feature importance 
@@ -4220,7 +4217,7 @@ data.frame(cor(train_soa_final)) %>%
   knitr::kable(caption="Correlation with y for the 9 most important features, in SOA")
 ```
 
-Given that they appear in the top lists it is worth looking in mode detail at the following:
+Given that features from these sources appear in the most important lists it is worth looking in more detail at the following:
 
 * Qualification predictors
 * Industry predictors
@@ -4232,7 +4229,7 @@ Given that they appear in the top lists it is worth looking in mode detail at th
 
 ### Qualification deep dive
 
-Looking at all the qualification features, and mapping against the y values.  Here only the Level4 and no qualification have values about 0.25, which is likely the reason for being important features in the models.  In addition, all are negatively correlated apart from Level 4, with level 1 and no qualification clearly negative.
+Looking at all the qualification features, and mapping against the y values.  Here only the Level4 and no qualification have values about 0.25, which is likely the reason for being important features in the models.  In addition, all are negatively correlated apart from Level 4, with level 1 and no qualification clearly negative, and the MSOA has a much tighter graph.
 
 ```{r graph of qualification features vs y soa, message=FALSE, fig.height=4}
 # qualification features SOA
@@ -4302,7 +4299,7 @@ train_set_final %>%
   ylab("proportion of level4 qualifications")
 ```
 
-This can be illustrated further with stratification of the level4 vs y by white uk, where you can see that for lower proportions of white UK, the link with education is less important.  Only SOA data is used here to provide more detail and variation.
+This can be illustrated further with stratification by 'white uk' of level4 plotted against y, where for lower proportions of 'white uk', the link with qualifications is less important.  Only SOA data is used here to provide more detail and variation.
 
 ```{r stratification by white uk proportion, message=FALSE, fig.height=4}
 # looking at stratification for the white uk, soa
@@ -4335,7 +4332,7 @@ train_soa_final %>%
 
 ### Industry predictors
 
-Visualising the industry predictors in the same way to the qualifications, most of the features have flatish results, apart from Industry KLMN, positive, and Manufacturing, construction and GI, negative.  Also, along with KLMN, OPQ is the only other industry which has high proportions in areas with high proportion of senior roles, even though overall it is flat.  This matches the press reports of the reliance of the UK on the professional services sector, and also public services. 
+Visualising the industry predictors in the same way to the qualifications, most of the features have flattish results, apart from Industry KLMN, positive, and Manufacturing, construction and GI, negative.  Also, along with KLMN, OPQ is the only other industry which has high proportions in areas with high proportion of senior roles, even though overall it is flat.  This matches the press reports of the reliance of the UK on the professional services sector, and also public services. 
 
 The key industries are:
 
@@ -4394,7 +4391,7 @@ train_set_final %>%  select(y, all_of(industry_features)) %>%
 
 ### Household status predictors
 
-In the household features, loneparent has a clear negative correlation, although it does not come out as an important feature, perhaps it is closely related to another feature, or that it, along with cohabiting has a lowish proportion, less than 0.4.  Married family, one person and cohabiting appear on the important lists, but have only a slight gradient.
+In the household features, 'loneparent' has a clear negative correlation, although it does not come out as an important feature, perhaps it is closely related to another feature, or that it, along with cohabiting has a lowish proportion, less than 0.4.  Married family, one person and cohabiting appear on the important lists, but have only a slight gradient.
 
 ```{r graph of household features vs y for soa, message=FALSE, fig.height=4}
 # household features soa
@@ -4480,13 +4477,13 @@ train_set_final %>%  select(y, all_of(marital_features)) %>%
 ```
 
 
-## Modelling without qualification features
+x   ## Modelling without qualification features
 
 As qualifications are so important to the models, in particular the Level4, it may be possible to identify other important features masked by the qualification features by modelling without those features. The GLM model will be used as it was high performing and fast, and provided information on feature importance.
 
-Starting with the MSOA data, removing the qualification features, the RMSE is 0.0314370 for GLM, vs 0.0166809 with the full data, significantly worse, and not so far from the baseline of the mean of 0.0965.
+Starting with the MSOA data, removing the qualification features, the RMSE is 0.0314370 for GLM, compared to 0.0166809 with the full data, significantly worse, and not so far from the baseline of the mean of 0.0965.
 
-Of the features, loneparent is important, as is construction, both of which had strongly negative correlations.  Ethnicities are not highlighted, with only white irish which was in the top list earlier.  However, Age and female ratio are in the top 10.
+Of the features, 'loneparent' is important, as is construction, both of which had strongly negative correlations.  Ethnicities are not highlighted further, with only 'white irish' which was in the top list earlier.  However, 'Age' and 'female ratio' are now in the top 10.
 
 ```{r prediction without qualification data, eval=FALSE}
 ## msoa data
@@ -4518,13 +4515,13 @@ plot(importance, 10)
 
 Part of the original motivation for this project was the reported lack of opportunities for certain ethnic groups, and this section investigates ethnic features to see if the features indicate anything similar to the press reports.
 
-The machine learning model led analysis has not indicated that ethnicities are as significant factors, apart from positive correlation with white Irish and white other.
+The machine learning model led analysis has not indicated that ethnicities are as significant factors, apart from positive correlation with 'white Irish' and 'white other'.
 
-However, looking at the data, this appears to support the general themes of the discussions.
+However, looking at the feature data, there are trends which appear to support the general themes of the discussions.
 
-In the visualisation of the distributions of proportions of ethnicities and y, proportion of managerial and professional roles, the fit lines are fairly flat apart from white other and white irish (positive).  But there are lots of graphs which show a triangle shape with low proportions of senior roles in areas with high concentrations of that ethnicity, particularly Black african, Black other and Pakistani.  These are the communities often highlighted in the press as having poor outcomes, backed up by the data here.
+In the visualisation of the distributions of proportions of ethnicities and y, proportion of managerial and professional roles, the fit lines are fairly flat apart from 'white other' and 'white irish' (positive).  But there are lots of graphs which show a triangle shape with low proportions of senior roles in areas with high concentrations of that ethnicity, particularly 'Black African', 'black other' and 'Pakistani'.  These are the communities often highlighted in the press as having poor outcomes, backed up by the data here.
 
-It is also interesting to compare the outcomes for white uk, white other and white Irish, where the latter two will primarily be migrants from EU, and they have very clear positive correlation, with white UK moderately negative - this indicates that EU migrants have better roles than white UK residents, which may be the underlying driver for Brexit.
+It is also interesting to compare the outcomes for 'white uk', 'white other' and 'white irish', where the latter two will primarily be migrants from EU, and they have very clear positive correlation, with white UK moderately negative - this indicates that EU migrants have better roles than white UK residents, which may be the underlying driver for Brexit.
 
 ```{r graph of ethnicity vs y for soa, message=FALSE, fig.height=4}
 #ethnicity features soa
@@ -4570,7 +4567,7 @@ train_set_final %>%
   ylab("proportion of ethnicity type")
 ```
 
-Looking at the correlations, and the p values, this matches the images, with white other, white Irish, Chinese and other positive, and Black African, Pakistani negative.  The p-value for all for the SOA data is 0, indicating that there probability of these results given no relationship is low - there is an effect.  For the MSOA, the p value is non-zero for Indian, black other and Bangladeshi, indicating a weaker effect, especially for Indian.
+Looking at the correlations, and the p values, this matches the images, with 'white other', 'white Irish', 'Chinese' and 'other' positive, and 'Black African', 'Pakistani' negative.  The p-value for all for the SOA data is 0, indicating that there probability of these results given no relationship is low - there is an effect.  For the MSOA, the p value is non-zero for 'Indian', 'black other' and 'Bangladeshi', indicating a weaker effect, especially for 'Indian'.
 
 ```{r correlation and p value for ethnicity and y soa, message=FALSE}
 # correlation with p value
@@ -4675,7 +4672,7 @@ train_set_final %>%
   ylab("proportion of ethnicity type")
 ```
 
-However, there are differences, with 'Black African' and 'Black Other' appearing to have worse occupation achievements than their educational achievements.  This is more clear looking at the values, with correlation between areas with more 'Black African' residents and Level4 qualification as -0.089220, vs -0.197096 for the senior occupations (SOA); for 'Black other' residents, the level4 qualification has a correlation of -0.013246, whereas the occupation has a correlation of -0.109491 for SOA, with similar results in the MSOA, with a roughly -0.1 between the qualification and occupation.
+However, there are differences, with 'Black African' and 'Black Other' appearing to have worse occupation achievements than their educational achievements.  This is more clear looking at the values, with correlation between areas with more 'Black African' residents and Level4 qualification as -0.089220, compared with -0.197096 for the senior occupations (SOA); for 'Black other' residents, the level4 qualification has a correlation of -0.013246, whereas the occupation has a correlation of -0.109491 for SOA, with similar results in the MSOA, with a roughly -0.1 between the qualification and occupation.
 
 ```{r table of correlation qualification and ethnicity in soa, message=FALSE}
 # extract the ethnicity features for SOA
@@ -4729,7 +4726,7 @@ data.frame(train_msoa_rcorr$r) %>%
   knitr::kable(caption = "Correlation and P results for ethnicity and level4 in MSOA") 
 ```
 
-Stratifying the data can explore how the relationship between qualifications and senior occupations varies with the proportion of black african and black other residents.  Limiting stratas to those with at least 50 samples, and using SOA only as there is more data, it is evident that the relation between occupation and qualification weakens with more Black African residents.
+Stratifying the data can explore how the relationship between qualifications and senior occupations varies with the proportion of 'Black African' and 'Black other' residents.  Limiting stratas to those with at least 50 samples, and using SOA only as there is more data, it is evident that the relation between occupation and qualification weakens with more 'Black African' residents.
 
 ```{r y vs level4 stratified by black african, message=FALSE, fig.height=4}
 # looking at stratification for the black african, soa
@@ -4771,7 +4768,7 @@ train_soa_final %>%
 
 Putting together a graph of all the ethnicities and their correlations, it is a confused picture, in part as the data does not have sufficient samples of areas for each strata, and also as the results are for areas with different proportions of each ethnicity.  We are unable to pick out the achievement of the residents of each ethnicity separately, but this gives a sense of direction.
 
-However, the overall correlation between level4 qualifications and the managerial and professional roles is 0.905, and this is only achieved in areas with white uk, white other, Asian other, and maybe Indian.  It is clear that when there are more non-white ethnicities, the correlation between qualification and role drops off, perhaps indicating that even with similar high achievement in qualifications it is harder for non-white ethnicities to obtain the best roles.
+However, the overall correlation between level4 qualifications and the managerial and professional roles is 0.905, and this is only achieved in areas with 'white uk', 'white other', 'Asian other', and maybe 'Indian'.  It is clear that when there are more non-white ethnicities, the correlation between qualification and role drops off, perhaps indicating that even with similar high achievement in qualifications it is harder for non-white ethnicities to obtain the best roles.
 
 ```{r graph of correlation with ethinicity proportion, message=FALSE}
 # graphing the correlation for each ethnicity
@@ -4927,7 +4924,7 @@ ethnicity_y_25_64_raw <- data %>%
   select(contains("geography") | 
            contains("Age 25 to 49") | 
            contains("Age 50 to 64") ) %>%
-  #keeping only the data relating to Highest Level of Qualification: All, to give all residents 25 to 64 by ethinicity 
+  #keeping only the data relating to Highest Level of Qualification: All, to give all residents 25 to 64 by ethnicity 
   select(contains("geography") | 
            contains("Occupation: 1. Managers") |
            contains("Occupation: 2. Professional") ) %>%
@@ -5020,11 +5017,11 @@ ethnicity_25_64 %>%
 *************
 \newpage
 # Results
-<!-- a results section that presents the modeling results and discusses the model performance  -->
+<!-- a results section that presents the modelling results and discusses the model performance  -->
 
 ## MSOA areas
 
-The optimal result for the MSOA data was from an ensemble of two models Support Vector Machines with a radial kernel (svmRadial) and Generalized Additive Model using Splines (GAM), where the GAM model needed a reduction of numbers of features to 28 in order to complete the calculations.
+The optimal result for the MSOA data was produced using a an ensemble of two algorithms: Support Vector Machines with a radial kernel (svmRadial) and Generalized Additive Model using Splines (GAM), where the GAM model needed a reduction of numbers of features to 28 in order to complete the calculations.
 
 Table: Summary of modelling results for MSOA areas
 
@@ -5037,7 +5034,7 @@ Table: Summary of modelling results for MSOA areas
 
 Many models appear to struggle with a large number of features, but on the other hand, the more features the better the model performance for the leading models, and therefore the models should include as many features as possible.
 
-The best models were linear regression, and variants of vector machines / gradient boosting.  The latter seemed to work quite well, but computationally expensive.
+The best models were linear regression, and variants of vector machines, gradient boosting, additive algorithms.  These last models, popular recently, seemed to work quite well, but computationally expensive.
 
 The models show that the achievement of senior management and professional occupations is closely linked to the level4 qualification, which must be why linear regression models perform well.
 
@@ -5046,7 +5043,7 @@ The models show that the achievement of senior management and professional occup
 
 The results for the SOA areas London and Yorkshire and Humber were not as good, although a larger improvement over the baseline of the mean of all locations.  This reflects the greater variation of the observations.
 
-In this case again an ensemble of 2 models was best performing, Support Vector Machines with a radial kernel (svmRadial) again, but Stochastic Gradient Boosting (GBM) as the second.
+In this case again an ensemble of 2 algorithms was best performing, Support Vector Machines with a radial kernel (svmRadial) again, but Stochastic Gradient Boosting (GBM) as the second.
 
 Table: Summary of modelling results for MSOA areas
 
@@ -5064,7 +5061,7 @@ Table: Summary of modelling results for MSOA areas
 
 This project developed a new data set from raw UK census data, which was then cleaned and prepared for machine learning to answer the following challenge:
 
-* predict the proportion of working age people each area that are one of the managerial and professional occupations
+* predict the proportion of working age people in each area that are one of the managerial and professional occupations
 
 The modelling was carried out by applying many different algorithms to focus down on the most effective ones, and with this building an ensemble.
 
@@ -5073,9 +5070,9 @@ In addition the project carried out detailed visualisations of the features, the
 
 ## Use of the census data
 
-The data set worked well as a continuous machine learning problem, it behaved well, with sensible results and a variation in different results from different algorithms.  The data put treated in this way also allowed for some interesting conclusions to be visualised from the features.
+The data set worked as a continuous machine learning problem, it behaved well, with sensible results and a variation in different results from different algorithms.  The census data prepared in this way also allowed for some interesting conclusions to be drawn from visualisations of the features.
 
-There were too many features, and some could probably be removed with little impact, but the imapct of removing the least 10 or so important features was not specifically tested.
+There were too many features, and some could probably be removed with little impact, but the impact of removing the least 10 or so important features was not specifically tested.
 
 The modelling with the MSOA, and the quick attempt at the SOA indicates that there is potential for a very large data set of 130,000 observations of 50 features, over 6 million pieces of publicly available data.  This may be of interest to test algorithms for working with large numbers of observations and features.
 
@@ -5095,46 +5092,49 @@ Table: Comparison of y, proportion of senior managers and professional occupatio
 |sd   |    0.134452|     0.095860|
 |max  |    0.887850|     0.661216|
 |min  |    0.000000|     0.063305|
+|rmse |    0.043189|     0.013991|
 
 
-### Model selection
+### Model selection and construction
 
-By working with a lot of algorithms and the final ensemble the machine learning analysis was able to make a significant stepwise improvement during the project.
+The machine learning analysis was able to make a significant stepwise improvement during the project by working with a lot of algorithms and constructing a final ensemble. The RMSE improved from a baseline "mean model" of 0.091347 to 0.015654 with the SVM Radial, and 0.014253 for the final ensemble for MSOA.  Similarly for the SOA, improving the RMSE from 0.1334185 to 0.0438095 with the SVM Radial, and 0.0431886 for the final ensemble.
 
-This study focused on the data and features, and to try many models, but each could be tuned, a huge amount of potential detailed investigation and improvement was not carried out.  
+This study focused on the data and features, and trying out a number of models, but without tuning them.  There is potential for detailed investigation and improvement for each model.
 
 In general the approach to the model selection was empirical: trying a variety of different types of model and then focusing down on to the ones that worked the best.  This seemed to work, although there are a large number of models that have not been tried, maybe there are better ones - the best individual model was the very last tried, which could easily have been missed.
 
 The best models seemed to be the fashionable ones, SVM and GAM, GBM, with the SVM Radial the best for both MSOA and SOA data sets.
 
+
 ### Modelling very large data sets
 
-The project only briefly worked with the larger data sets from the SOA to verify that it worked, and there were problems with algorithms being able to handle both large numbers of features and observations.
+The project only briefly worked with the larger data sets from the SOA to verify that it worked, and there were problems with algorithms being able to handle both large numbers of features and observations, however it was possible to generate results.
 
-There will be many different approaches to large data sets, but these were not researched as the focus was the msoa.  For example, not all the observations in the training data were used in the final result, and clearly using more data should improve, perhaps an ensemble of subsets of data?
+There will be many different approaches to large data sets, but these were not researched as the focus was the MSOA  For example, not all the observations in the training data were used in the final result, and clearly using more data should improve, perhaps an ensemble of subsets of data?
 
 
 ### Model interpretation
 
-In general interpretability from the models was not very clear.  Many have no indication of feature importance, or ways to get information out, without running many times with different sets of features.  Furthermore, many of the popular ones for predictions using boosting or additive processes for iterative improvement which obfuscate the data an implications.
+In general interpretability from the models was not very clear.  Many have no indication of feature importance, or ways to get information out, without running many times with different sets of features.  Furthermore, many of the popular models for predictions using boosting or additive processes for iterative improvement which obfuscate the causality further.
 
-In addition, the investigation at the end appeared to show some implications from the ethnicity features which were not highlighted in model, where less intuitive features like lone parent came out as more important.  This may be because there were a lot of related features, so each on its own is less important (such as ethnicity and country of birth), in contrast to age, female ratio, lone parent which are individual.  This does make it hard to use machine learning models to make conclusions other than predictions.
+In addition, the feature investigation at the end appeared to show some implications from the ethnicity features which were not highlighted in model outputs.  This may be because there were a lot of related features, so each on its own is less important (such as ethnicity and country of birth), in contrast to age, female ratio, lone parent which may not have so many related features, and hence are highlighted by the models.
 
 The "high correlation" function in caret did not work well at helping feature selection, as some of the listed highly correlated features were the key ones.  Using feature importance seemed to work, and would be better for future analysis.
 
 
 ## Implications from the modelling
 
-By far and away the most important element for high quality occupation is qualifications.  As this is by area, it is not clear on cause and effect, that is, the highly qualified people all move to where the best jobs are, or that the best jobs are where there are highly qualified people.  But the public policy implications are clear, ensuring all groups have access to education and qualifications is critical to ensure no one is left behind.  Or another way, if any cohort has poor qualification achievements they will have poor achievements in work, throughout their life.
+By far and away the most important feature for a high quality occupation is qualifications.  As this is by geographic area, it is not clear on cause and effect: do highly qualified people all move to where the best jobs are, or are the best jobs where there are highly qualified people?  But the public policy implications are clear, ensuring all groups have access to education and qualifications is critical to ensure no one is left behind.  Or another way, if any cohort has poor qualification achievements they will have poor achievements in work, throughout their life.
 
-Beyond that, the conclusions from the models was not clear, other than the place of birth did was not highlighted as an issue at all, ethnicity, households and so on were much more important
+Beyond that, the conclusions from the models was not clear, other than the country of birth did was not highlighted as an issue at all, ethnicity, households and so on were much more important, as was working in Industry KLMN (Financial and Real estate, Professional, scientific, and Administrative).
 
-There were implications from the features in the data set which were interesting, and align with recent political and press articles:
+There were interesting implications from the analysis of the features, which align with recent political and press articles:
 
-* there appeared poor achievements for white uk, both in occupations and qualifications.  This is in contrast to other white ethnicities, "white Irish" and "white other" both highly qualified and with the best jobs - which could be the source of the anti-EU sentiment, and populism in general with the white UK population.
-*  poor occupation achievements for "black other" and "black African", despite good qualifications.  This is again in contrast to non-UK white ethnicities - which could be the source of the UK variant of the Black Lives Matter movement, which is highlighting the predjudice and lack of opportunities.
-* "lone parent" and "divorced" have clear negative impacts, and this should be investigated further, but this implies poor roles for the residents in these households.  Possibly more support should be provided, probably around child care, and this probably impacts women more than men.
+*  'white uk' was negatively correlated with both senior occupations and qualifications.  In contrast, other white ethnicities, "white Irish" and "white other" were both highly qualified and with the best jobs.  This could be the source of the anti-EU sentiment (Brexit), and populism in general within the white UK population, and supports the idea of "left behind" white working class communities discussed in the press.
+*  poor occupation achievements for "black other" and "black African", despite good qualifications.  In contrast, white ethnicities generally have qualifications and occupation achievements aligned.  This is evidence of the UK variant of the Black Lives Matter movement, which is highlighting prejudice and lack of opportunities, "white privilege".  
+* "lone parent" and "divorced" have clear negative impacts, implying poor roles for the residents in these households.  Possibly more support should be provided to these residents, probably around child care.
 
+According to a recent study only 4.7% of the most powerful 1100 jobs are held by black, Asian and minority ethnic people, compared with the 13% proportion of the UK population. https://www.theguardian.com/business/2020/jul/28/bame-representation-uk-top-jobs-colour-of-power-survey 
 
 ## Further work
 
@@ -5145,7 +5145,7 @@ The following section describes a few potential ways to extend the work, both fr
 
 From a modelling perspective, the analysis could be extended by focusing on one or two algorithms and go into depth to optimise and improve the performance - can it outperform an ensemble of non-optimised models?
 
-Also, there are many models which were not tried, another approach would be to move beyond the empirical model selection process and to use logic based on the specific data set to selecting specific models, and to find the best single model, to improve on the SVM Radial.
+There are many models which were not tried, another approach would be to move beyond the empirical model selection process and to use logic based on the specific data set to selecting specific models, and to find the best single model, to improve on the SVM Radial.
 
 Finally, given that the best performing models are ones that are regularly highlighted, another alternative approach would be a literature review to identify the most popular algorithms today and focus on those.
 
@@ -5154,34 +5154,15 @@ Finally, given that the best performing models are ones that are regularly highl
 
 The project could be extended by focusing on the SOA instead of the MSOA, and investigate working with methodologies to address large data sets, with large numbers of features and observations.
 
-The analysis on numbers of features and observations could be improved, by taking a systematic approach, such as a measure of the computation expense vs RMSE performance, for each step in observations of features, to identify the optimal point.  Similarly, computation expense can be used as part of model selection, RMSE improvement per CPU time.  This could be particularly helpful to select models using smaller data sets with the intention to be used on the larger data sets.
+The analysis on numbers of features and observations could be improved, by taking a systematic approach, such as a measure of the computation expense against RMSE performance, for each step increase in observations or features, to identify the optimal point.  Similarly, computation expense can be used as part of model selection, RMSE improvement per CPU time.  This could be particularly helpful to select models using smaller data sets with the intention to be used on the larger data sets.
 
 
 ### Societal implications
 
-Firstly, the SOA data looked useful, but it would be better to use the full 130,000 observations for the whole of England and Wales.
+The SOA data looked useful to draw conclusions from the features, but it would be better to use the full 130,000 observations for the whole of England and Wales rather than the subset in just two regions.
 
-This study was to focus on machine learning, but it could be extended and change focus to analyse the statistical implications of the data, the studying correlations, confounding data and statistical significance of the different factors
+This study was focused on machine learning, but it could be extended and change focus to analyse the statistical implications of the data, the studying correlations, confounding data and statistical significance of the different factors/features.  And to extend the statistical analysis with other sources of data.
+
 For example, "White other" is positively correlated with the high achievements in occupations, and "Pakistini" and "Bangladeshi" are negatively, and this could be due to education and qualifications (the press mentions the poor school outcomes for some ethnicities, and for working class white UK people), and it would be interesting to investigate causality in terms of drivers.
-
-
-
-### Further potential implications
-
-
-https://www.theguardian.com/business/2020/jul/28/bame-representation-uk-top-jobs-colour-of-power-survey 
-"The proportion of black, Asian and minority ethnic people in some of the 1,100 most powerful jobs in the UK has barely moved over the past three years, according to a study that highlights the lack of non-white representation across key roles.
-
-Only 51 out of the 1097 most powerful roles in the country are filled by non-white individuals, an increase of only 1.2%, or 15 people, since 2017, the Colour of Power survey by consultants Green Park and not-for-profit organisation Operation Black Vote said.
-
-That represented 4.7% of the total number compared with the 13% proportion of the UK population."
-https://thecolourofpower.com/
-
-
-https://www.theguardian.com/fashion/2020/jul/29/numbers-dont-lie-how-data-reveals-fashions-inclusivity-problem
-https://www.ethnicity-facts-figures.service.gov.uk/work-pay-and-benefits/employment/employment-by-occupation/latest
-
-https://www.ethnicity-facts-figures.service.gov.uk/education-skills-and-training/after-education/destinations-and-earnings-of-graduates-after-higher-education/latest
-
 
 **************
