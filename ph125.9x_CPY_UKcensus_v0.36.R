@@ -1,6 +1,6 @@
 #### ph125.9x Capstone choose your own project - UK census ####
 # Paul Ceely
-# 07/07/2020 to 10/09/2020
+# 07/07/2020 to 12/09/2020
 ################## set up #####################
 # this was developed and ran with RStudio:
 # RStudio Version 1.3.1073
@@ -9,6 +9,12 @@
 # language       R                           
 # version.string R version 4.0.2 (2020-06-22)
 # with the latest packages installed
+#################### notes #######################
+# this code takes around 17 hours to run in total
+# it downloads files from the internet, storing locally
+# it creates subdirectories of the location directory of the script,
+# for storing raw downloaded data in ~/data and r objects in ~/rda
+# it will use around 1.9GB of space for around 150 files
 #################### initial set up ##########################
 # setwd("~/Documents/study/Data-Science-R/ph125.9.Capstone/ChooseYourOwn")
 # set the working directory as the current directory of the file
