@@ -1,6 +1,6 @@
 #### ph125.9x Capstone choose your own project - UK census ####
 # Paul Ceely
-# 07/07/2020 to 30/08/2020
+# 07/07/2020 to 10/09/2020
 ################## set up #####################
 # this was developed and ran with RStudio:
 # RStudio Version 1.3.1073
@@ -1495,7 +1495,6 @@ rm(main, test_index)
 # load("rda/test_set.rda")
 # load("rda/train_set.rda")
 
-
 #### data cleanse ####
 # carry out the following
 # * create ratio of occupied/all
@@ -1558,8 +1557,9 @@ length(levels(as.factor(train_set_final$area_code)))
 # tidy up
 save(test_set_final, file="rda/test_set_final.rda")
 save(train_set_final, file="rda/train_set_final.rda")
-rm(test_set, train_set, geo_lookup, main)
-rm(train_set_final, train_set_final2)
+rm(test_set, train_set, geo_lookup)
+# rm(train_set_final)
+# rm(train_set_final2)
 
 #### baseline rmse and rmse function ####
 #load the test and train data
@@ -2712,7 +2712,7 @@ rmse_results %>% tail(5) %>% knitr::kable()
 # tidy up
 save(y_hat_ens_table2, file="rda/y_hat_ens_table2.rda")
 save(rmse_results, file="rda/rmse_results.rda")
-rm(y_hat_ens_table2, rmse_ens, y_hat_ens_table)
+rm(y_hat_ens_table2, rmse_ens)
 
 
 #### feature prioritisation ####
@@ -3115,7 +3115,6 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>%
   # arrange(rmse) %>% head(10) %>% knitr::kable()
   arrange(rmse) %>% head(20) %>% knitr::kable()
-
 # tidy up
 save(y_hat_ens_table5, file="rda/y_hat_ens_table5.rda")
 save(rmse_results, file="rda/rmse_results.rda")
@@ -3126,10 +3125,12 @@ rm(result_gam_train_top28, result_glm_train_set_final)
 rm(result_svmradial_train_set_final)
 rm(feature_rank)
 
+
 #### Investigation and visualisation of errors ####
 # looking at the best ensemble model, and constituent ones svmRadial and gam
 # plot of y against y_hat for all three
 load("rda/y_hat_ens_table5.rda")
+load("rda/test_set_final.rda")
 y_hat_ens_table5 %>%
   cbind(y = test_set_final$y) %>%
   dplyr::rename(ensemble_y_hat=y_hat_ave) %>%
@@ -3338,13 +3339,8 @@ data_set <- import_data("2013265923TYPE299")
 load("rda/data_set_2013265923TYPE299.rda")
 # tidy up
 data_set_yorkshire <- data_set
-rm(marital_predictors, country_predictors, occupation_target)
-rm(ethnicity_predictors, household_predictors, religion_predictors)
-rm(industry_predictors, sex_predictors)
-rm(qualifications_predictors, age_predictors)
-rm(import_data)
+rm(data_set)
 rm(censusdata_list)
-
 
 #combine in to one data set
 data_set <- data_set_london %>%
@@ -4596,3 +4592,8 @@ ethnicity_25_64 %>%
   ylab("Proportion of each ethnic group")
 
 #####  the end ######
+rm(marital_predictors, country_predictors, occupation_target)
+rm(ethnicity_predictors, household_predictors, religion_predictors)
+rm(industry_predictors, sex_predictors)
+rm(qualifications_predictors, age_predictors)
+rm(import_data)
